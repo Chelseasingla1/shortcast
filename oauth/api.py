@@ -1,7 +1,6 @@
 import logging
 from flask import Blueprint, request, session, jsonify
 from oauth.oauth import TwitchUserService, extract_twitch_info,GithubUserService,extract_github_info, OauthFacade
-from flask_login import current_user, login_required
 from auth.auth import _login_user
 
 logging.basicConfig(level=logging.INFO)
@@ -10,7 +9,7 @@ logger = logging.getLogger(__name__)
 oauth = Blueprint("oauth", __name__, template_folder='templates/oauth')
 
 
-@oauth.route('/api/v1/callback')
+@oauth.route('/callback')
 def callback():
     """
        OAuth callback for handling the authentication response
@@ -77,6 +76,7 @@ def callback():
     client = request.args.get('client',default=None)
     error = request.args.get('error', default=None)
     error_description = request.args.get('error_description', default=None)
+    logger.info(f'this is : {client}')
     if code:
         data = {'code': code, 'state': state, 'scope': scope}
         try:
@@ -87,14 +87,16 @@ def callback():
 
                 access_token = oauth_obj.get_access_token(data=data)
                 session['oauth_token_data'] = access_token
+                logger.info(f'saved token:{access_token}')
                 return _login_user()
             elif client == 'github':
                 oauth_obj = OauthFacade(client=client, response_type="code",
-                                        scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-                                               "user:read:follows"])
+                                        scope=["user:read:email"])
 
                 access_token = oauth_obj.get_access_token(data=data)
-                session['oauth_token_data'] = access_token
+                access_data = {'access_token':access_token,'client':client}
+                session['oauth_token_data'] = access_data
+                logger.info(f'saved token:{access_token}')
                 return _login_user()
         except Exception as e:
             logger.error(f'failed token handling: {e}')
@@ -105,14 +107,12 @@ def callback():
         try:
             if client == 'twitch':
                 oauth_obj = OauthFacade(client=client,response_type="code",
-                                        scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-                                               "user:read:follows"])
+                                        scope=["user:read:email", "user:read:broadcast"])
                 oauth_obj.get_access_token(**data)
                 return jsonify('Failed Authentication'), 401
             elif client == 'github':
                 oauth_obj = OauthFacade(client=client, response_type="code",
-                                        scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-                                               "user:read:follows"])
+                                        scope=["user:read:email"])
                 oauth_obj.get_access_token(**data)
                 return jsonify('Failed Authentication'), 401
 
@@ -121,5 +121,3 @@ def callback():
             return jsonify('error'), 400
     else:
         return jsonify('invalid'), 401
-
-# TODO: remember to add the client query param

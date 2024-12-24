@@ -1,7 +1,7 @@
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
-from flask import Blueprint, url_for, redirect, session, render_template
+from flask import Blueprint, url_for, redirect, session, render_template, jsonify
 from flask_login import login_user, logout_user,current_user
 from oauth.oauth import TwitchUserService, extract_twitch_info,GithubUserService,extract_github_info, OauthFacade
 from models import User,db
@@ -15,12 +15,12 @@ auth = Blueprint("auth", __name__, template_folder="templates/auth", static_fold
 def _login_user():
     oauth_data = session.get('oauth_token_data')
     if not oauth_data:
-        logger.error("No OAuth data found in session.")
+        logger.error("No OAuth data found in session,redirecting to login page")
         return redirect(url_for('auth.login_get'))
 
     access_token = oauth_data.get('access_token')
     client=oauth_data.get('client')
-    refresh_token = oauth_data.get('refresh_token')
+    # refresh_token = oauth_data.get('refresh_token')
 
     try:
         twitch_user = None
@@ -30,6 +30,7 @@ def _login_user():
         email =None
         profile_image_url = None
         if client == 'twitch':
+            logger.info('twitch route')
             twitch_user = TwitchUserService(access_token=access_token)
             twitch_user_data = twitch_user.get_user_details()
             user_id = extract_twitch_info(twitch_user_data, 'id')
@@ -38,13 +39,15 @@ def _login_user():
             profile_image_url = extract_twitch_info(twitch_user_data, 'profile_image_url')
 
         elif client == 'github':
+            logger.info('github route')
             github_user = GithubUserService(access_token=access_token)
             github_user_data = github_user.get_user_details()
             user_id = extract_github_info(github_user_data, 'id')
             username = extract_github_info(github_user_data, 'name')
             email = extract_github_info(github_user_data, 'email')
             profile_image_url = extract_github_info(github_user_data, 'avatar_url')
-
+        else:
+            return jsonify('invalid'),400
     except Exception as e:
         logger.error(f"Error fetching user details from Github: {e}")
         return redirect(url_for('auth.login_get'))
@@ -83,7 +86,7 @@ def _login_user():
         db.session.rollback()
         return redirect(url_for('auth.login_get'))
 
-    return redirect(url_for('main.home'))
+    return jsonify('successful'),200
 
 
 @auth.get('/api/v1/login')
@@ -113,7 +116,7 @@ def login_get():
     auth_instance_twitch = oauth_obj_twitch
     auth_instance_github = oauth_obj_github
     auth_instances:[] = [auth_instance_github.get_auth_link(),auth_instance_twitch.get_auth_link()]
-    return render_template('signup.html', auth_link=auth_instances)
+    return jsonify(auth_instances)
 
 #TODO : write refresh token route
 

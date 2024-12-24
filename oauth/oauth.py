@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 import http.client
 from http.client import HTTPException
+from os import access
 from urllib.parse import quote, urlencode
 from uuid import uuid4, UUID
 from typing import Union, Dict, Any
@@ -142,7 +143,7 @@ class GithubOauthAccessCode(TwitchOauthBase):
     base_url = 'github.com'
 
     def __init__(self):
-        self.conn = http.client.HTTPSConnection(TwitchOauthAccessCode.base_url)
+        self.conn = http.client.HTTPSConnection(GithubOauthAccessCode.base_url)
 
     def validate_token(self, access_token: str):
         endpoint = '/oauth2/validate'
@@ -152,7 +153,7 @@ class GithubOauthAccessCode(TwitchOauthBase):
     def authorize(self, authorize_obj: Authorization):
         endpoint = 'https://github.com/login/oauth/authorize'
         query = f'?response_type={authorize_obj.response_type}&client_id={authorize_obj.client_id}&redirect_uri={authorize_obj.redirect_uri}' \
-                f'&scope={authorize_obj.scope}&state={authorize_obj.state}'
+                f'&scope={authorize_obj.scope}&state={authorize_obj.state}&client=github'
         return endpoint + query
 
     def get_redirect_data(self, authorize_obj: Authorization, **kwargs):
@@ -172,33 +173,37 @@ class GithubOauthAccessCode(TwitchOauthBase):
 
     def get_token(self, authorize_obj: Authorization):
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-        endpoint = '/oauth2/token'
+        endpoint = '/login/oauth/access_token'
         body = {'client_id': authorize_obj.client_id, 'client_secret': authorize_obj.client_secret,
                 'code': authorize_obj.code, 'grant_type': authorize_obj.grant_type,
                 'redirect_uri': authorize_obj.redirect_uri}
         encoded_params = urlencode(body)
+
         try:
             self.conn.request('POST', endpoint, body=encoded_params, headers=headers)
             res = self.conn.getresponse()
+
+
 
             if res.status != 200:
                 raise HTTPException(f"Error {res.status}: {res.reason}")
 
             data = res.read()
-            json_data = json.loads(data.decode('utf-8'))
-
-            access_token = json_data.get('access_token')
+            json_data:str = data.decode('utf-8')
+            access_token = json_data.split('&')[0].split('=')[1]
+            access_token = access_token
             if access_token is None:
                 raise ValueError("Access token not found in the response")
 
             authorize_obj.access_token = access_token
-            return json_data
+            return access_token
 
         except HTTPException as http_err:
             print(f"HTTP error occurred: {http_err}")
             return None
-        except json.JSONDecodeError:
-            print("Failed to parse JSON response")
+        except json.JSONDecodeError as json_err:
+            print('here')
+            print(f"Failed to parse JSON response: {json_err}")
             return None
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
@@ -240,7 +245,7 @@ class TwitchOauthAccessCode(TwitchOauthBase):
     def authorize(self, authorize_obj: Authorization):
         endpoint = 'https://id.twitch.tv/oauth2/authorize'
         query = f'?response_type={authorize_obj.response_type}&client_id={authorize_obj.client_id}&redirect_uri={authorize_obj.redirect_uri}' \
-                f'&scope={authorize_obj.scope}&state={authorize_obj.state}'
+                f'&scope={authorize_obj.scope}&state={authorize_obj.state}&client=twitch'
         return endpoint + query
 
     def get_redirect_data(self, authorize_obj: Authorization, **kwargs):
@@ -382,15 +387,17 @@ class TwitchUserBase(ABC):
 
 
 class GithubUserService(TwitchUserBase):
-    base_url = 'github.com'
+    base_url = 'api.github.com'
 
     def __init__(self, access_token: str):
         self.access_token = access_token
-        self.conn = http.client.HTTPSConnection(TwitchUserService.base_url)
-        self.headers = {'Authorization': f'Bearer {self.access_token}', 'Client-Id': os.environ.get('TWITCH_CLIENT_ID')}
+        self.conn = http.client.HTTPSConnection(GithubUserService.base_url)
+        github_secret_key = os.environ.get('GITHUB_ID')
+
+        self.headers = {'Authorization': f'Bearer {self.access_token}',"Accept": "application/json", 'Client-Id':github_secret_key, "User-Agent": "shortcast" }
 
     def get_user_details(self):
-        endpoint = '/users/:username'
+        endpoint = '/user'
         self.conn.request('GET', endpoint, headers=self.headers)
         response = self.conn.getresponse()
         data = response.read()
@@ -435,16 +442,17 @@ def extract_github_info(data: Dict[str, Any], key: str) -> Union[str, None]:
         user_info = user_data.get(key)
         if user_info is None:
             print(f"Key '{key}' not found in user data.")
+            return 'none'
         return user_info
     return None
 
 
 
 
-if __name__ == '__main__':
-
-    oauth_obj = OauthFacade(client='github',response_type="code",
-                            scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-                                   "user:read:follows"])
-    auth_instance = oauth_obj
-    auth_link = auth_instance.get_auth_link()
+# if __name__ == '__main__':
+#
+#     oauth_obj = OauthFacade(client='github',response_type="code",
+#                             scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
+#                                    "user:read:follows"])
+#     auth_instance = oauth_obj
+#     auth_link = auth_instance.get_auth_link()
