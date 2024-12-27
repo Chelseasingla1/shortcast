@@ -16,6 +16,14 @@ class User(db.Model, UserMixin):
     id: Mapped[int] = mapped_column(primary_key=True, unique=True)
     username: Mapped[str] = mapped_column()
     email: Mapped[str] = mapped_column()
-    # token_data: Mapped[str] = mapped_column()
+    access_token: Mapped[str] = mapped_column()
     profile_image_url: Mapped[str] = mapped_column()
-    # streams: Mapped[List['Stream']] = relationship('Stream', back_populates='user')
+    podcast: Mapped[List['Podcast']] = relationship('Podcast', back_populates='user')
+
+class Podcast(db.Model):
+    id: Mapped[int] = mapped_column(primary_key=True, unique=True)
+    title: Mapped[str] = mapped_column()
+    link: Mapped[str] = mapped_column()
+    user: Mapped[User] = relationship('User', back_populates='streams')
+
+# TODO : filter by , title,user,posted
