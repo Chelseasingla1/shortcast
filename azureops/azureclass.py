@@ -68,6 +68,14 @@ class AzureStorage(ABC):
     def set_blob_metadata(self,container_name:str,blob_name:str,metadata:dict):
         ...
 
+    @abstractmethod
+    def stream_blob_part(self,container_name:str,blob_name:str,start_byte:int,end_byte:int):
+        ...
+
+    @abstractmethod
+    def stream_blob_full(self, container_name: str, blob_name: str):
+        ...
+
 
 class AzureBlobStorage(AzureStorage):
     def __init__(self, connection_string: str):
@@ -98,7 +106,7 @@ class AzureBlobStorage(AzureStorage):
             self.blob_client.upload_blob(data)
         logger.info(f"Blob '{blob_name}' uploaded successfully to container '{container_name}'.")
 
-    def download_blob(self, container_name: str, blob_name: str, download_path: str):
+    def download_blob(self, container_name: str, blob_name: str, download_path: str,**kwargs):
         self.container_client = self.blob_service_client.get_container_client(container_name)
         self.blob_client = self.container_client.get_blob_client(blob_name)
         with open(download_path, "wb") as download_file:
@@ -132,6 +140,22 @@ class AzureBlobStorage(AzureStorage):
         self.blob_client.set_blob_metadata(metadata)
         logger.info(f"Metadata for blob '{blob_name}' updated successfully.")
 
+    def stream_blob_part(self,container_name:str,blob_name:str,start_byte:int,end_byte:int):
+        self.container_client = self.blob_service_client.get_container_client(container_name)
+        self.blob_client = self.container_client.get_blob_client(blob_name)
+        byte_data = self.blob_client.download_blob(offset=start_byte, length=end_byte - start_byte + 1)
+        data = byte_data.readall()
+        logger.info(f'Blob streaming part')
+        return data
+    def stream_blob_full(self, container_name: str, blob_name: str):
+        self.container_client = self.blob_service_client.get_container_client(container_name)
+        self.blob_client = self.container_client.get_blob_client(blob_name)
+        byte_data = self.blob_client.download_blob()
+        data = byte_data.readall()
+        logger.info(f'Blob streaming full')
+        return data
+
+
 
 # TESTING
 # azure_instance = AzureBlobStorage(connection_string=connection_string)
@@ -141,5 +165,4 @@ class AzureBlobStorage(AzureStorage):
 # azure_instance.download_blob('ultimate','first.py','text.py')
 # azure_instance.delete_blob('ultimate','first.py')
 # print(azure_instance.list_blobs('ultimate'))
-# TODO : write the code for azure client class(45 mins)
 # TODO: write the essential route for interacting with the azure client class(30mins)
