@@ -165,4 +165,4 @@ class AzureBlobStorage(AzureStorage):
 # azure_instance.download_blob('ultimate','first.py','text.py')
 # azure_instance.delete_blob('ultimate','first.py')
 # print(azure_instance.list_blobs('ultimate'))
-# TODO: write the essential route for interacting with the azure client class(30mins)
+

@@ -1,7 +1,6 @@
 import os
-from http.client import responses
-
-from flask import Blueprint,request,url_for,jsonify,send_file,Response
+from redisclass import save_playback_position,get_playback_position,redis_client
+from flask import Blueprint, request, url_for, jsonify, send_file, Response, session
 from werkzeug.utils import secure_filename
 from flask_login import login_required
 from azureops.azureclass import AzureBlobStorage
@@ -119,6 +118,12 @@ def stream_blob(container_name,blob_name):
         blob_size = properties.get('size')
         range_header = request.headers.get('Range')
 
+        user_id = session.get('user_id')
+
+
+
+        current_position = get_playback_position(user_id)
+
         if range_header:
             byte_range = range_header.replace('bytes=', '').split('-')
             start_byte = int(byte_range[0])
@@ -128,17 +133,29 @@ def stream_blob(container_name,blob_name):
                 return jsonify({
                     'error':'Range out of bounds'
                 }),416
-
-            byte_data = azure_storage_instance.stream_blob_part(container_name, blob_name, start_byte, end_byte)
-            data = byte_data
+            cache_key = f"{container_name}:{blob_name}:{start_byte}:{end_byte}"
+            cached_chunk = redis_client.get(cache_key)
+            if cached_chunk:
+                print('Fetching from redis cache')
+                data = cached_chunk
+            else:
+                print("Fetching from Azure Blob Storage")
+                byte_data = azure_storage_instance.stream_blob_part(container_name, blob_name, start_byte, end_byte)
+                data = byte_data
+                redis_client.set(cache_key,data,ex=3600)
+                print("Cached chunk in Redis")
 
             response = Response(data,status=206,content_type='audio/mpeg')
             response.headers['Content-Range'] = f'bytes {start_byte}-{end_byte}/{blob_size}'
+            save_playback_position(user_id, end_byte + 1)
             return response
         else:
             byte_data = azure_storage_instance.stream_blob_full(container_name, blob_name)
             data = byte_data
             response = Response(data,content_type='audio/mpeg')
+            save_playback_position(user_id, current_position + len(data))
             return response
     except Exception as e:
         return jsonify({'error':str(e)}),500
+
+
