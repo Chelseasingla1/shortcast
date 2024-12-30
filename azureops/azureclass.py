@@ -166,3 +166,5 @@ class AzureBlobStorage(AzureStorage):
 # azure_instance.delete_blob('ultimate','first.py')
 # print(azure_instance.list_blobs('ultimate'))
 
+# TODO: add a max podcast size,proper file validation,add a uuid as blob name
+# TODO: structure database properly

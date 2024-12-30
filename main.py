@@ -6,6 +6,7 @@ from flasgger import Swagger
 from models import *
 from auth.auth import auth
 from oauth.api import oauth
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 CORS(app)
@@ -15,6 +16,7 @@ app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///project.db'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
 db.init_app(app)
+migrate = Migrate(app,db)
 app.register_blueprint(auth)
 app.register_blueprint(oauth)
 
