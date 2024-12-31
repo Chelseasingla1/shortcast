@@ -15,7 +15,7 @@ def list_downloads() -> list[Download]:
 
 
 @download.post('/api/v1/downloads')
-def download():
+def download_podcast_episode():
     data = request.json
     user_id = data.get('user_id')
     podcast_id = data.get('podcast_id')
@@ -30,7 +30,7 @@ def download():
 
 
 @download.delete('/api/v1/downloads')
-def delete_download():
+def remove_download():
     data = request.json
     user_id = data.get('user_id')
     podcast_id = data.get('podcast_id')

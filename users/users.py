@@ -1,4 +1,4 @@
-from flask import Blueprint, request,url_for, redirect, session,jsonify
+from flask import Blueprint, request,jsonify
 import logging
 from models import User,db
 from model_utils import role_check
@@ -10,15 +10,16 @@ users = Blueprint("users", __name__)
 @users.get('/api/v1/users')
 def list_users() -> list[User]:
     user_list:list[User] = User.query.all()
+    logger.info(f'list of users: {user_list}')
     return user_list
 
-@users.get('/api/v1/<id>')
-def get_user(id):
-    user = User.query.filter_by(id=id).first()
+@users.get('/api/v1/users/<user_id>')
+def get_user(user_id):
+    user = User.query.filter_by(id=user_id).first()
     if user:
         return user
     else:
-        return
+        return {'msg':'user not found'}
 
 @users.post('/api/v1/users')
 def create_user():
@@ -30,24 +31,26 @@ def create_user():
     email = data.get('email')
     role = role_check(str(data.get('role')).upper())
     try:
-        new_user = User(oauth_provider = oauth_provider,oauth_id = oauth_id,username = username,profile_image_url = profile_image_url,email = email,role=role)
+        new_user = User(oauth_provider=oauth_provider,oauth_id = oauth_id,username = username,profile_image_url = profile_image_url,email = email,role=role)
         db.session.add(new_user)
 
     # Commit the transaction (this makes the changes permanent in the database)
         db.session.commit()
+        logger.info('added user')
         return jsonify({'msg':'successfully created user'})
     except Exception as e:
         db.session.rollback()
+        logger.error('failed to add user')
         return f"Error occurred: {str(e)}"
 
-@users.put('/api/v1/users/<int:id>')
-def update_user(id):
+@users.put('/api/v1/users/<int:user_id>')
+def update_user(user_id):
     data = request.json
     username = data.get('username')
     profile_image_url = data.get('profile_image_url')
     email = data.get('email')
 
-    user = User.query.get(id)
+    user = User.query.get(user_id)
     if user:
         if 'username' in data:
             user.username = username
@@ -67,10 +70,10 @@ def update_user(id):
     else:
         return jsonify({'message': 'User not found!'}), 404
 
-@users.delete('/api/v1/users/<int:id>')
-def delete_user(id):
+@users.delete('/api/v1/users/<int:user_id>')
+def delete_user(user_id):
     try:
-        user = User.query.get(id)
+        user = User.query.get(user_id)
 
         if user:
             # Mark the user for deletion

@@ -30,3 +30,9 @@ def role_check(role: str):
        return Roles.ADMIN
    elif role == "USER":
        return Roles.USER
+
+def provider_check(provider:str):
+    if provider == 'GITHUB':
+        return Providers.GITHUB
+    elif provider == 'TWITCH':
+        return Providers.TWITCH

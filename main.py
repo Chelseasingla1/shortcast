@@ -59,4 +59,8 @@ if __name__ == '__main__':
         db.create_all()
     app.run(debug=True)
 
+#TODO : test the different azureapi with postman
+#TODO : test the different database api with postman
+#TODO: integrate the azureapi with the database as well as the authentication api
+#TODO : properly handle session and roles
 #TODO: add a streaming functionality
