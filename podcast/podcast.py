@@ -1,27 +1,121 @@
-from flask import Blueprint, request,jsonify
+from flask import Blueprint, request, jsonify
 import logging
-from models import db,Podcast
+from models import db, Podcast
 from model_utils import provider_check
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 podcast = Blueprint("podcast", __name__)
 
 @podcast.get('/api/v1/podcasts')
-def list_podcasts() -> list[Podcast]:
-    podcast_list:list[Podcast] = Podcast.query.all()
-    return podcast_list
+def list_podcasts():
+    """
+    List all podcasts.
+    ---
+    tags:
+        - Podcast
+    get:
+        description: Retrieve a list of all podcasts.
+        responses:
+            200:
+                description: A list of all podcasts.
+                schema:
+                    type: array
+                    items:
+                        $ref: '#/definitions/Podcast'
+    """
+    podcast_list = Podcast.query.all()
+    podcast_list_dict = [podcast.to_dict() for podcast in podcast_list]
+    return jsonify({'status': 'success', 'message': 'retrieved all podcasts', 'data': podcast_list_dict}), 200
 
-@podcast.get('/api/v1/podcasts/<podcast_id>')
+
+@podcast.get('/api/v1/podcasts/<int:podcast_id>')
 def get_podcast(podcast_id):
+    """
+    Get a podcast by its ID.
+    ---
+    tags:
+        - Podcast
+    get:
+        description: Retrieve details of a specific podcast by its ID.
+        parameters:
+            - name: podcast_id
+              in: path
+              type: integer
+              description: ID of the podcast to retrieve.
+              required: true
+        responses:
+            200:
+                description: Details of the podcast.
+                schema:
+                    $ref: '#/definitions/Podcast'
+            404:
+                description: Podcast not found.
+    """
     podcast_ = Podcast.query.filter_by(id=podcast_id).first()
     if podcast_:
-        return podcast_
+        return jsonify({'status': 'success', 'message': 'retrieved podcast details', 'data': podcast_.to_dict()}), 200
     else:
-        return
+        return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
+
 
 @podcast.post('/api/v1/podcasts')
 def create_podcast():
+    """
+    Create a new podcast.
+    ---
+    tags:
+        - Podcast
+    post:
+        description: Create a new podcast with the provided data.
+        parameters:
+            - name: title
+              in: body
+              type: string
+              description: Title of the podcast.
+              required: true
+            - name: description
+              in: body
+              type: string
+              description: Description of the podcast.
+              required: true
+            - name: category
+              in: body
+              type: string
+              description: Category of the podcast.
+              required: true
+            - name: publisher
+              in: body
+              type: string
+              description: Publisher of the podcast.
+              required: true
+            - name: image_url
+              in: body
+              type: string
+              description: Image URL for the podcast cover.
+              required: false
+            - name: feed_url
+              in: body
+              type: string
+              description: RSS Feed URL for the podcast.
+              required: false
+            - name: audio_url
+              in: body
+              type: string
+              description: Audio URL for the podcast.
+              required: true
+            - name: duration
+              in: body
+              type: string
+              description: Duration of the podcast episode.
+              required: false
+        responses:
+            200:
+                description: Successfully created the podcast.
+            400:
+                description: Missing required fields or invalid data.
+    """
     data = request.json
     title = data.get('title')
     description = data.get('description')
@@ -32,22 +126,64 @@ def create_podcast():
     audio_url = data.get('audio_url')
     duration = data.get('duration')
 
+    if not title or not description or not category or not publisher or not audio_url:
+        return jsonify({'status': 'error', 'message': 'Missing required fields', 'data': None}), 400
+
     try:
-        new_podcast = None
-        if feed_url:
-            new_podcast = Podcast(title=title,description = description,category = category,publisher = publisher,image_url = image_url,audio_url = audio_url,duration =duration)
-        elif audio_url:
-            new_podcast = Podcast(title=title, description=description, category=category, publisher=publisher,
-                                  image_url=image_url, audio_url=audio_url, duration=duration)
+        new_podcast = Podcast(title=title, description=description, category=category, publisher=publisher,
+                              image_url=image_url, feed_url=feed_url, audio_url=audio_url, duration=duration)
+
         db.session.add(new_podcast)
         db.session.commit()
-        return jsonify({'msg':'successfully created podcast'})
+
+        return jsonify({'status': 'success', 'message': 'Podcast created successfully', 'data': new_podcast.to_dict()}), 201
     except Exception as e:
         db.session.rollback()
-        return f"Error occurred: {str(e)}"
+        logger.error(f"Error creating podcast: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Podcast not created', 'error_code': 'SERVER_ERROR', 'data': None}), 500
+
 
 @podcast.put('/api/v1/podcasts/<int:podcast_id>')
 def update_podcast(podcast_id):
+    """
+    Update an existing podcast.
+    ---
+    tags:
+        - Podcast
+    put:
+        description: Update a podcast's details by its ID.
+        parameters:
+            - name: podcast_id
+              in: path
+              type: integer
+              description: ID of the podcast to update.
+              required: true
+            - name: title
+              in: body
+              type: string
+              description: New title of the podcast.
+              required: false
+            - name: description
+              in: body
+              type: string
+              description: New description of the podcast.
+              required: false
+            - name: category
+              in: body
+              type: string
+              description: New category of the podcast.
+              required: false
+            - name: image_url
+              in: body
+              type: string
+              description: New image URL for the podcast cover.
+              required: false
+        responses:
+            200:
+                description: Podcast updated successfully.
+            404:
+                description: Podcast not found.
+    """
     data = request.json
     title = data.get('title')
     description = data.get('description')
@@ -57,43 +193,56 @@ def update_podcast(podcast_id):
     podcast_ = Podcast.query.get(podcast_id)
     if podcast_:
         if 'title' in data:
-            Podcast.title = title
+            podcast_.title = title
         if 'description' in data:
-            Podcast.description = description
+            podcast_.description = description
         if 'category' in data:
-            Podcast.category = category
+            podcast_.category = category
         if 'image_url' in data:
-            Podcast.image_url = image_url
+            podcast_.image_url = image_url
+
         try:
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            return jsonify({'error':str(e)})
+            return jsonify({'status': 'error', 'message': str(e), 'data': None}), 500
 
-        return jsonify({
-            'message': 'Podcast updated successfully!'
-        })
+        return jsonify({'status': 'success', 'message': 'Podcast updated successfully!', 'data': podcast_.to_dict()}), 200
     else:
-        return jsonify({'message': 'Podcast not found!'}), 404
+        return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
+
 
 @podcast.delete('/api/v1/podcasts/<int:podcast_id>')
 def delete_podcast(podcast_id):
+    """
+    Delete a podcast by its ID.
+    ---
+    tags:
+        - Podcast
+    delete:
+        description: Delete a podcast by its ID.
+        parameters:
+            - name: podcast_id
+              in: path
+              type: integer
+              description: ID of the podcast to delete.
+              required: true
+        responses:
+            200:
+                description: Podcast deleted successfully.
+            404:
+                description: Podcast not found.
+    """
     try:
         podcast_ = Podcast.query.get(podcast_id)
 
         if podcast_:
-            # Mark the user for deletion
             db.session.delete(podcast_)
-
-            # Commit the transaction (this deletes the user from the database)
             db.session.commit()
-
-            return jsonify({'message': f'Podcast {id} deleted successfully!'}), 200
+            return jsonify({'status': 'success', 'message': f'Podcast {podcast_id} deleted successfully!', 'data': None}), 200
         else:
-            return jsonify({'message': 'Podcast not found!'}), 404
+            return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
     except Exception as e:
         db.session.rollback()
-        return jsonify({'message':str(e)})
-
-
-#TODO : change relationship to be with the parent to enable smart-deletion
+        logger.error(f"Error deleting podcast: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Podcast not deleted', 'error_code': 'SERVER_ERROR', 'data': None}), 500

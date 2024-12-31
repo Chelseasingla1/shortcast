@@ -1,11 +1,10 @@
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
-from flask import Blueprint, url_for, redirect, session, render_template, jsonify
+from flask import Blueprint, url_for, redirect, session, jsonify
 from flask_login import login_user, logout_user, current_user
 from oauth.oauth import TwitchUserService, extract_twitch_info, GithubUserService, extract_github_info, OauthFacade
 from models import User, db
-from model_utils import Providers
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -13,11 +12,13 @@ logger = logging.getLogger(__name__)
 auth = Blueprint("auth", __name__, template_folder="templates/auth", static_folder="static")
 
 
-def _login_user():
+def login_user_():
     oauth_data = session.get('oauth_token_data')
+
     if not oauth_data:
-        logger.error("No OAuth data found in session,redirecting to login page")
-        return redirect(url_for('auth.login_get'))
+        logger.error("No OAuth data found in session, redirecting to login page")
+        # You can return a response with a relevant message for the frontend
+        return jsonify({'status': 'error', 'message': 'No session data, please log in again','data':None}), 401
 
     access_token = oauth_data.get('access_token')
     client = oauth_data.get('client')
@@ -48,10 +49,10 @@ def _login_user():
             email = extract_github_info(github_user_data, 'email')
             profile_image_url = extract_github_info(github_user_data, 'avatar_url')
         else:
-            return jsonify('invalid'), 400
+            return jsonify({'status':'error','message':'Invalid client','error_code':'VALIDATION ERROR','data':None}), 400
     except Exception as e:
         logger.error(f"Error fetching user details from Github: {e}")
-        return redirect(url_for('auth.login_get'))
+        return jsonify({'status':'error','message':'Internal Server error','error_code':'SERVER ERROR','data':None}), 500
 
     logger.info(f"Fetched user details: {username}, {user_id}, {email}, {profile_image_url}")
 
@@ -63,7 +64,14 @@ def _login_user():
         logger.info(f"User logged in: {existing_user.username}")
         logger.info(f"Current user: {current_user.username}")
         logger.info(f"Is authenticated: {current_user.is_authenticated}")
-        return redirect(url_for('main.home'))
+        user_data = {
+            "id": existing_user.id,
+            "username": existing_user.username,
+            "email": existing_user.email,
+            "profile_image_url": existing_user.profile_image_url,  # optional, if you have this
+            "role": existing_user.role
+        }
+        return jsonify({'status':'success','message':'user logged in','data':user_data}),201
 
     new_user = User(
         oauth_id=user_id,
@@ -80,30 +88,43 @@ def _login_user():
     except SQLAlchemyError as e:
         logger.error(f"Database error while adding new user: {e}")
         db.session.rollback()
-        return redirect(url_for('auth.login_get'))
+        jsonify({'status':'error','message':'Internal Server error','error_code':'VALIDATION ERROR','data':None}), 500
     except Exception as e:
         logger.error(f"Unexpected error while adding new user: {e}")
         db.session.rollback()
-        return redirect(url_for('auth.login_get'))
+        return jsonify({'status':'error','message':'Internal Server error','error_code':'VALIDATION ERROR','data':None}), 500
 
-    return jsonify('successful'), 200
+    user_data = {
+        "id": existing_user.id,
+        "username": existing_user.username,
+        "email": existing_user.email,
+        "profile_image_url": existing_user.profile_image_url,  # optional, if you have this
+        "role": existing_user.role
+    }
 
+    return jsonify({'status':'success','message':'user logged in','data':user_data}),201
 
 @auth.get('/api/v1/login')
 def login_get():
     """
-       Get the OAuth login link
-       ---
-       description: This endpoint generates an OAuth login link for user authentication.
-       responses:
-         200:
-           description: Renders the signup page with the OAuth login link.
-           content:
-             text/html:
-               schema:
-                 type: string
-                 example: "<html>...signup page content...</html>"
-       """
+    Get the OAuth login link
+    ---
+    tags:
+      - Authentication
+    description: This endpoint generates an OAuth login link for user authentication via third-party services like Twitch and GitHub.
+    responses:
+      200:
+        description: Returns the OAuth login links for Twitch and GitHub.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+              example:
+                - "https://twitch.tv/oauth/authorize?...credentials"
+                - "https://github.com/login/oauth/authorize?...credentials"
+    """
 
     oauth_obj_twitch = OauthFacade('twitch', response_type="code",
                                    scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
@@ -115,26 +136,26 @@ def login_get():
 
     auth_instance_twitch = oauth_obj_twitch
     auth_instance_github = oauth_obj_github
-    auth_instances: [] = [auth_instance_github.get_auth_link(), auth_instance_twitch.get_auth_link()]
-    return jsonify(auth_instances)
+    auth_instances: dict = {'github_link':auth_instance_github.get_auth_link(), 'twitch_link':auth_instance_twitch.get_auth_link()}
+    return jsonify({'status':'success','message':'links generated','data':auth_instances}),200
 
-
-# TODO : write refresh token route
 
 @auth.route('/api/v1/logout')
 def logout():
     """
-        Logout the current user
-        ---
-        description: This endpoint logs out the current user by ending their session and redirecting to the login page.
-        responses:
-          302:
-            description: Redirects the user to the login page after logging out.
-            content:
-              text/html:
-                schema:
-                  type: string
-                  example: "Redirecting to /login..."
-        """
+    Logout the current user
+    ---
+    tags:
+      - Authentication
+    description: This endpoint logs out the current user by ending their session and redirecting to the login page.
+    responses:
+      302:
+        description: Redirects the user to the login page after logging out.
+        content:
+          text/html:
+            schema:
+              type: string
+              example: "Redirecting to /login..."
+    """
     logout_user()
-    return redirect(url_for('auth.login_get'))
+    return jsonify({'status': 'success', 'message': 'user logged out'}), 200

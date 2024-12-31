@@ -1,60 +1,136 @@
 from flask import Blueprint, request, jsonify
 import logging
 from models import db, Favourite
-
+from flask_login import current_user
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 favourite = Blueprint("favourite", __name__)
 
-
 @favourite.get('/api/v1/favourites')
-def list_favourites() -> list[Favourite]:
-    favourite_list: list[Favourite] = Favourite.query.all()
-    return favourite_list
+def list_favourites():
+    """
+    List all favourites.
+    ---
+    tags:
+        - Favourite
+    get:
+        description: Retrieve a list of all favourites (either podcast or episode).
+        responses:
+            200:
+                description: A list of all favourites.
+                schema:
+                    type: array
+                    items:
+                        $ref: '#/definitions/Favourite'
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'status': 'error', 'message': 'User not authenticated'}), 403
+
+    favourite_list: list[Favourite] = Favourite.query.filter_by(user_id=current_user.id).all()
+    favourite_list_dict = [item.to_dict() for item in favourite_list]
+    return jsonify({'status': 'success', 'message': 'got downloads', 'data': favourite_list_dict}), 201
 
 
 @favourite.post('/api/v1/favourites')
 def add_podcast_to_favourite():
+    """
+    Add a podcast or episode to favourites.
+    ---
+    tags:
+        - Favourite
+    post:
+        description: Add a podcast or episode to the user's favourites.
+        parameters:
+            - name: user_id
+              in: body
+              type: integer
+              description: ID of the user.
+              required: true
+            - name: podcast_id
+              in: body
+              type: integer
+              description: ID of the podcast (optional, either podcast_id or episode_id should be provided).
+              required: false
+            - name: episode_id
+              in: body
+              type: integer
+              description: ID of the episode (optional, either podcast_id or episode_id should be provided).
+              required: false
+        responses:
+            200:
+                description: Successfully added to favourites.
+            400:
+                description: Missing required fields or invalid data.
+    """
     data = request.json
-    user_id = data.get('user_id')
     podcast_id = data.get('podcast_id')
     episode_id = data.get('episode_id')
 
     try:
-        new_favourite = Favourite(user_id=user_id,podcast_id=podcast_id,episode_id=episode_id)
+        new_favourite = Favourite(user_id=current_user.id, podcast_id=podcast_id, episode_id=episode_id)
         db.session.add(new_favourite)
-
-        # Commit the transaction (this makes the changes permanent in the database)
         db.session.commit()
-        return jsonify({'msg': 'successfully added to favourite'})
+        return jsonify({'status': 'success', 'message': 'added to favourite', 'data': None}), 201
     except Exception as e:
         db.session.rollback()
-        return f"Error occurred: {str(e)}"
+        logger.error(str(e))
+        return jsonify({'status': 'error', 'message': 'favourite action failed', 'error_code': 'SERVER ERROR',
+                        'data': None}), 500
 
 
 @favourite.delete('/api/v1/favourites')
 def remove_from_favourite():
+    """
+    Remove a podcast or episode from favourites.
+    ---
+    tags:
+        - Favourite
+    delete:
+        description: Remove a podcast or episode from the user's favourites.
+        parameters:
+            - name: user_id
+              in: body
+              type: integer
+              description: ID of the user.
+              required: true
+            - name: podcast_id
+              in: body
+              type: integer
+              description: ID of the podcast (optional, either podcast_id or episode_id should be provided).
+              required: false
+            - name: episode_id
+              in: body
+              type: integer
+              description: ID of the episode (optional, either podcast_id or episode_id should be provided).
+              required: false
+        responses:
+            200:
+                description: Successfully removed from favourites.
+            404:
+                description: Favourite not found.
+    """
     data = request.json
-    user_id = data.get('user_id')
     podcast_id = data.get('podcast_id')
     episode_id = data.get('episode_id')
 
     try:
-        favourite_= None
+        favourite_ = None
         if podcast_id:
-            favourite_ = Favourite.query.filter_by(user_id=user_id, podcast_id=podcast_id).first()
+            favourite_ = Favourite.query.filter_by(user_id=current_user.id, podcast_id=podcast_id).first()
         elif episode_id:
-            favourite_ = Favourite.query.filter_by(user_id=user_id, episode_id=episode_id).first()
+            favourite_ = Favourite.query.filter_by(user_id=current_user.id, episode_id=episode_id).first()
 
         if favourite_:
-            # Mark the user for deletion
             db.session.delete(favourite_)
             db.session.commit()
 
-            return jsonify({'message': f'Favourite {id} deleted successfully!'}), 200
+            return jsonify({'status': 'success', 'message': 'removed from favourite', 'data': None}), 201
         else:
-            return jsonify({'message': 'Favourite not found!'}), 404
+            return jsonify({'status': 'error', 'message': 'Not found','data':None}), 404
     except Exception as e:
         db.session.rollback()
-        return jsonify({'message': str(e)})
+        logger.error(str(e))
+        return jsonify({'status': 'error', 'message': 'favourite not removed', 'error_code': 'SERVER ERROR',
+                        'data': None}), 500
+

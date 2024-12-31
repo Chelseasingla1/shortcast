@@ -15,13 +15,16 @@ from podcast.podcast import podcast
 from rating.rating import rating
 from sharedplaylist.sharedplaylist import shared_playlist
 from subscription.subscription import subscription
+from azureops.azureapi import azure_api
 from users.users import users
 from flask_migrate import Migrate
+from flask_login import LoginManager,login_required
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+login_manager = LoginManager()
 app = Flask(__name__)
+login_manager.init_app(app)
 CORS(app)
 swagger = Swagger(app)
 
@@ -34,6 +37,7 @@ db.init_app(app)
 migrate = Migrate(app,db)
 app.register_blueprint(auth)
 app.register_blueprint(oauth)
+app.register_blueprint(azure_api)
 app.register_blueprint(download)
 app.register_blueprint(episode)
 app.register_blueprint(favourite)
@@ -45,13 +49,18 @@ app.register_blueprint(shared_playlist)
 app.register_blueprint(subscription)
 app.register_blueprint(users)
 
+@app.route('/')
+def home():
+    return jsonify({'msg':'success'})
 
 @app.errorhandler(401)
 def unauthorized(error):
     logger.info(error)
     return jsonify({'status': 'failed', 'error': 'You need to be logged in to access this resource'}), 401
 
-
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(user_id)
 
 
 if __name__ == '__main__':
