@@ -1,4 +1,4 @@
-import os
+import os,logging
 from datetime import timedelta
 from flask import Flask,jsonify
 from flask_cors import CORS
@@ -16,8 +16,10 @@ from rating.rating import rating
 from sharedplaylist.sharedplaylist import shared_playlist
 from subscription.subscription import subscription
 from users.users import users
-
 from flask_migrate import Migrate
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
@@ -46,6 +48,7 @@ app.register_blueprint(users)
 
 @app.errorhandler(401)
 def unauthorized(error):
+    logger.info(error)
     return jsonify({'status': 'failed', 'error': 'You need to be logged in to access this resource'}), 401
 
 
