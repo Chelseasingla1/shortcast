@@ -2,9 +2,10 @@ import logging
 
 from sqlalchemy.exc import SQLAlchemyError
 from flask import Blueprint, url_for, redirect, session, render_template, jsonify
-from flask_login import login_user, logout_user,current_user
-from oauth.oauth import TwitchUserService, extract_twitch_info,GithubUserService,extract_github_info, OauthFacade
-from models import User,db
+from flask_login import login_user, logout_user, current_user
+from oauth.oauth import TwitchUserService, extract_twitch_info, GithubUserService, extract_github_info, OauthFacade
+from models import User, db
+from model_utils import Providers
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,15 +20,15 @@ def _login_user():
         return redirect(url_for('auth.login_get'))
 
     access_token = oauth_data.get('access_token')
-    client=oauth_data.get('client')
+    client = oauth_data.get('client')
     # refresh_token = oauth_data.get('refresh_token')
 
     try:
         twitch_user = None
         twitch_user_data = None
-        user_id =None
+        user_id = None
         username = None
-        email =None
+        email = None
         profile_image_url = None
         if client == 'twitch':
             logger.info('twitch route')
@@ -47,15 +48,14 @@ def _login_user():
             email = extract_github_info(github_user_data, 'email')
             profile_image_url = extract_github_info(github_user_data, 'avatar_url')
         else:
-            return jsonify('invalid'),400
+            return jsonify('invalid'), 400
     except Exception as e:
         logger.error(f"Error fetching user details from Github: {e}")
         return redirect(url_for('auth.login_get'))
 
-
     logger.info(f"Fetched user details: {username}, {user_id}, {email}, {profile_image_url}")
 
-    existing_user = db.session.execute(db.select(User).filter_by(id=user_id)).scalar_one_or_none()
+    existing_user = db.session.execute(db.select(User).filter_by(oauth_id=user_id)).scalar_one_or_none()
 
     if existing_user:
         login_user(existing_user)
@@ -66,10 +66,10 @@ def _login_user():
         return redirect(url_for('main.home'))
 
     new_user = User(
-        id=user_id,
+        oauth_id=user_id,
         username=username,
+        profile_image_url=profile_image_url,
         email=email,
-        profile_image_url=profile_image_url
     )
 
     try:
@@ -86,7 +86,7 @@ def _login_user():
         db.session.rollback()
         return redirect(url_for('auth.login_get'))
 
-    return jsonify('successful'),200
+    return jsonify('successful'), 200
 
 
 @auth.get('/api/v1/login')
@@ -105,20 +105,21 @@ def login_get():
                  example: "<html>...signup page content...</html>"
        """
 
-    oauth_obj_twitch = OauthFacade('twitch',response_type="code",
-                            scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-                                   "user:read:follows"])
+    oauth_obj_twitch = OauthFacade('twitch', response_type="code",
+                                   scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
+                                          "user:read:follows"])
 
-    oauth_obj_github = OauthFacade('github',response_type="code",
-                            scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-                                   "user:read:follows"])
+    oauth_obj_github = OauthFacade('github', response_type="code",
+                                   scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
+                                          "user:read:follows"])
 
     auth_instance_twitch = oauth_obj_twitch
     auth_instance_github = oauth_obj_github
-    auth_instances:[] = [auth_instance_github.get_auth_link(),auth_instance_twitch.get_auth_link()]
+    auth_instances: [] = [auth_instance_github.get_auth_link(), auth_instance_twitch.get_auth_link()]
     return jsonify(auth_instances)
 
-#TODO : write refresh token route
+
+# TODO : write refresh token route
 
 @auth.route('/api/v1/logout')
 def logout():

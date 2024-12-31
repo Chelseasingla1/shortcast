@@ -25,3 +25,8 @@ class Categories(Enum):
       TV_AND_FILM = auto()
 
 
+def role_check(role: str):
+   if role == "ADMIN":
+       return Roles.ADMIN
+   elif role == "USER":
+       return Roles.USER
