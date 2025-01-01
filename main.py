@@ -30,7 +30,7 @@ swagger = Swagger(app)
 
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///project.db'
-app.config['SQLALCHEMY_ECHO'] = True
+# app.config['SQLALCHEMY_ECHO'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
 
 db.init_app(app)

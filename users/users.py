@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import logging
 from models import User, db
 from model_utils import role_check
-
+from  flask_login import current_user
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -11,19 +11,48 @@ users = Blueprint("users", __name__)
 @users.get('/api/v1/users')
 def list_users():
     """
-    List all users.
+    Retrieve a list of all users.
     ---
     tags:
         - User
-    get:
-        description: Retrieve a list of all users.
-        responses:
-            200:
-                description: A list of all users.
-                schema:
-                    type: array
-                    items:
-                        $ref: '#/definitions/User'
+    summary: Returns a list of all users in the system.
+    description: This endpoint retrieves all users from the database and returns them as a JSON array.
+    responses:
+        200:
+            description: Successfully retrieved the list of users.
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            status:
+                                type: string
+                                example: 'success'
+                            message:
+                                type: string
+                                example: 'Retrieved all users'
+                            data:
+                                type: array
+                                items:
+                                    $ref: '#/components/schemas/User'
+        500:
+            description: Internal server error occurred while retrieving users.
+            content:
+                application/json:
+                    schema:
+                        type: object
+                        properties:
+                            status:
+                                type: string
+                                example: 'error'
+                            message:
+                                type: string
+                                example: 'Failed to retrieve users'
+                            error_code:
+                                type: string
+                                example: 'SERVER_ERROR'
+                            data:
+                                type: 'null'
     """
     try:
         user_list = User.query.all()
@@ -34,37 +63,83 @@ def list_users():
         return jsonify({'status': 'error', 'message': 'Failed to retrieve users', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
 
-@users.get('/api/v1/users/<int:user_id>')
-def get_user(user_id):
+@users.get('/api/v1/users')
+def get_user():
     """
     Retrieve a user by their ID.
     ---
     tags:
         - User
     get:
-        description: Retrieve a user by their unique ID.
+        description: Retrieve a user from the system by their unique user ID.
         parameters:
             - name: user_id
               in: path
               type: integer
-              description: ID of the user to retrieve.
+              description: The unique ID of the user to retrieve.
               required: true
         responses:
             200:
-                description: A user object.
-                schema:
-                    $ref: '#/definitions/User'
+                description: Successfully retrieved the user information.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status:
+                                    type: string
+                                    example: 'success'
+                                message:
+                                    type: string
+                                    example: 'User found'
+                                data:
+                                    type: array
+                                    items:
+                                        $ref: '#/components/schemas/User'
+
             404:
-                description: User not found.
+                description: User not found with the given ID.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status:
+                                    type: string
+                                    example: 'error'
+                                message:
+                                    type: string
+                                    example: 'User not found'
+                                data:
+                                    type: null
+            500:
+                description: Internal server error while retrieving user data.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status:
+                                    type: string
+                                    example: 'error'
+                                message:
+                                    type: string
+                                    example: 'Failed to retrieve user'
+                                error_code:
+                                    type: string
+                                    example: 'SERVER_ERROR'
+                                data:
+                                    type: null
     """
     try:
-        user = User.query.filter_by(id=user_id).first()
+        user = User.query.filter_by(id=current_user.id).first()
+        print(user.to_dict())
         if user:
             return jsonify({'status': 'success', 'message': 'User found', 'data': user.to_dict()}), 200
         else:
             return jsonify({'status': 'error', 'message': 'User not found', 'data': None}), 404
     except Exception as e:
-        logger.error(f"Error retrieving user {user_id}: {str(e)}")
+        logger.error(f"Error retrieving user {current_user.id}: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve user', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
 
@@ -144,41 +219,98 @@ def create_user():
         return jsonify({'status': 'error', 'message': 'Failed to create user', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
 
-@users.put('/api/v1/users/<int:user_id>')
-def update_user(user_id):
+@users.put('/api/v1/users')
+def update_user():
     """
     Update user information.
     ---
     tags:
         - User
     put:
-        description: Update a user's information.
+        description: Update a user's information in the system by their unique user ID. You can update the username, profile image URL, and email.
         parameters:
             - name: user_id
               in: path
               type: integer
-              description: ID of the user to update.
+              description: The unique ID of the user to update.
               required: true
             - name: username
               in: body
               type: string
-              description: New username.
+              description: New username to update.
               required: false
             - name: profile_image_url
               in: body
               type: string
-              description: New profile image URL.
+              description: New profile image URL to update.
               required: false
             - name: email
               in: body
               type: string
-              description: New email.
+              description: New email to update.
               required: false
         responses:
             200:
-                description: User updated successfully.
+                description: User updated successfully with the new information.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status:
+                                    type: string
+                                    example: 'success'
+                                message:
+                                    type: string
+                                    example: 'User updated successfully'
+                                data:
+                                    type: object
+                                    properties:
+                                        id:
+                                            type: integer
+                                            description: The unique ID of the user.
+                                        username:
+                                            type: string
+                                            description: The updated username of the user.
+                                        email:
+                                            type: string
+                                            description: The updated email of the user.
+                                        profile_image_url:
+                                            type: string
+                                            description: The updated profile image URL of the user.
             404:
-                description: User not found.
+                description: User not found with the given ID.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status:
+                                    type: string
+                                    example: 'error'
+                                message:
+                                    type: string
+                                    example: 'User not found'
+                                data:
+                                    type: null
+            500:
+                description: Internal server error while updating the user data.
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                status:
+                                    type: string
+                                    example: 'error'
+                                message:
+                                    type: string
+                                    example: 'Failed to update user'
+                                error_code:
+                                    type: string
+                                    example: 'SERVER_ERROR'
+                                data:
+                                    type: null
     """
     data = request.json
     username = data.get('username')
@@ -186,7 +318,7 @@ def update_user(user_id):
     email = data.get('email')
 
     try:
-        user = User.query.get(user_id)
+        user = User.query.get(current_user.id)
         if user:
             if 'username' in data:
                 user.username = username
@@ -201,12 +333,12 @@ def update_user(user_id):
             return jsonify({'status': 'error', 'message': 'User not found', 'data': None}), 404
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error updating user {user_id}: {str(e)}")
+        logger.error(f"Error updating user {current_user.id}: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to update user', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
 
-@users.delete('/api/v1/users/<int:user_id>')
-def delete_user(user_id):
+@users.delete('/api/v1/users')
+def delete_user():
     """
     Delete a user by their ID.
     ---
@@ -227,14 +359,14 @@ def delete_user(user_id):
                 description: User not found.
     """
     try:
-        user = User.query.get(user_id)
+        user = User.query.get(current_user.id)
         if user:
             db.session.delete(user)
             db.session.commit()
-            return jsonify({'status': 'success', 'message': f'User {user_id} deleted successfully', 'data': None}), 200
+            return jsonify({'status': 'success', 'message': f'User {current_user.id} deleted successfully', 'data': None}), 200
         else:
             return jsonify({'status': 'error', 'message': 'User not found', 'data': None}), 404
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Error deleting user {user_id}: {str(e)}")
+        logger.error(f"Error deleting user {current_user.id}: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to delete user', 'error_code': 'SERVER_ERROR', 'data': None}), 500

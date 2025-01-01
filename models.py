@@ -28,6 +28,17 @@ class User(db.Model,UserMixin):
     playlist = db.relationship('Playlist', backref='user',cascade = 'all ,delete-orphan')
     ratings: Mapped[list['Rating']] = db.relationship('Rating', backref='user',cascade='all, delete-orphan')
     downloads: Mapped[list['Download']] = db.relationship('Download', backref='user', cascade='all, delete-orphan')
+
+    def to_dict(self):
+
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'role':self.role,
+            'created_at': self.created_at.isoformat()  # Convert datetime to ISO format string
+        }
+
 class Podcast(db.Model):
     id: Mapped[int] = mapped_column(Integer,primary_key=True,autoincrement=True)
     title: Mapped[str] = mapped_column(String,nullable=False)
