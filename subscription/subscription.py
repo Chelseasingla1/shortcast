@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 import logging
 from models import db, Subscription
-
+from flask_login import current_user
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -24,13 +24,46 @@ def list_subscriptions():
                     items:
                         $ref: '#/definitions/Subscription'
     """
+    data = request.json
+
     try:
+
         subscription_list = Subscription.query.all()
         subscriptions_dict = [subscription.to_dict() for subscription in subscription_list]
         return jsonify({'status': 'success', 'message': 'Retrieved all subscriptions', 'data': subscriptions_dict}), 200
     except Exception as e:
         logger.error(f"Error retrieving subscriptions: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve subscriptions', 'error_code': 'SERVER_ERROR', 'data': None}), 500
+
+@subscription.get('/api/v1/subscriptions/podcast')
+def list_podcast_subscribers_count():
+    data = request.json
+    podcast_id = data.get('podcast_id')
+    try:
+        count = 0
+        subscription_list = Subscription.query.filter_by(podcast_id=podcast_id).all()
+        count = len(subscription_list)
+        return jsonify({'status': 'success', 'message': 'Retrieved podcast subscriber count', 'data': count}), 200
+    except Exception as e:
+        logger.error(f"Error retrieving podcast subscriber count: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Failed to retrieve podcast subscribers count', 'error_code': 'SERVER_ERROR', 'data': None}), 500
+
+
+@subscription.get('/api/v1/subscriptions/subscribed')
+def list_subscriber_subscribed():
+    data = request.json
+    try:
+        count = 0
+        subscription_list = Subscription.query.filter_by(podcast_id=current_user.id).all()
+        subscriptions_dict = [item.podcast.to_dict() for item in subscription_list]
+        count = len(subscription_list)
+        result = {'podcasts':subscriptions_dict,'count':count}
+        return jsonify({'status': 'success', 'message': 'Retrieved podcast subscriber count', 'data': result}), 200
+    except Exception as e:
+        logger.error(f"Error retrieving podcast subscriber count: {str(e)}")
+        return jsonify(
+            {'status': 'error', 'message': 'Failed to retrieve podcast subscribers count', 'error_code': 'SERVER_ERROR',
+             'data': None}), 500
 
 
 @subscription.post('/api/v1/subscriptions')
@@ -60,9 +93,9 @@ def subscribe_to_podcast():
                 description: Missing required fields or invalid data.
     """
     data = request.json
-    user_id = data.get('user_id')
+    user_id = current_user.id
     podcast_id = data.get('podcast_id')
-
+    print(user_id,podcast_id)
     if not user_id or not podcast_id:
         return jsonify({'status': 'error', 'message': 'Missing required fields', 'data': None}), 400
 

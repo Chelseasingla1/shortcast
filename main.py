@@ -11,6 +11,7 @@ from episode.episode import episode
 from favourite.favourite import favourite
 from playlist.playlist import playlist
 from playlistitem.playlistitem import playlistitem
+from playlist_bridge.playlist_bridge import playlist_item_bp
 from podcast.podcast import podcast
 from rating.rating import rating
 from sharedplaylist.sharedplaylist import shared_playlist
@@ -48,6 +49,8 @@ app.register_blueprint(rating)
 app.register_blueprint(shared_playlist)
 app.register_blueprint(subscription)
 app.register_blueprint(users)
+app.register_blueprint(playlist_item_bp)
+
 
 @app.route('/')
 def home():

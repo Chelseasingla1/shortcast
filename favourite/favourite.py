@@ -31,6 +31,21 @@ def list_favourites():
     favourite_list_dict = [item.to_dict() for item in favourite_list]
     return jsonify({'status': 'success', 'message': 'got downloads', 'data': favourite_list_dict}), 201
 
+@favourite.get('/api/v1/favourites/podcast')
+def favourites_podcast_count():
+    data = request.json
+    podcast_id = data.get('podcast_id')
+    try:
+        count = 0
+        favourite_list = Favourite.query.filter_by(podcast_id=podcast_id).all()
+        count = len(favourite_list)
+        return jsonify({'status': 'success', 'message': 'Retrieved number of likes', 'data': count}), 200
+    except Exception as e:
+        logger.error(f"Error retrieving numeber of likes: {str(e)}")
+        return jsonify(
+            {'status': 'error', 'message': 'Failed to retrieve number of likes', 'error_code': 'SERVER_ERROR',
+             'data': None}), 500
+
 
 @favourite.post('/api/v1/favourites')
 def add_podcast_to_favourite():

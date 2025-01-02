@@ -1,7 +1,7 @@
 import logging
 
 from sqlalchemy.exc import SQLAlchemyError
-from flask import Blueprint, url_for, redirect, session, jsonify
+from flask import Blueprint, session, jsonify
 from flask_login import login_user, logout_user, current_user
 from oauth.oauth import TwitchUserService, extract_twitch_info, GithubUserService, extract_github_info, OauthFacade
 from models import User, db
@@ -9,7 +9,7 @@ from models import User, db
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-auth = Blueprint("auth", __name__, template_folder="templates/auth", static_folder="static")
+auth = Blueprint("auth", __name__)
 
 
 def login_user_():

@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
 import logging
 from models import db, Rating
+from flask_login import current_user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 rating = Blueprint("rating", __name__)
 
@@ -31,6 +33,34 @@ def list_ratings():
     except Exception as e:
         logger.error(f"Error retrieving ratings: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve ratings', 'error_code': 'SERVER_ERROR', 'data': None}), 500
+
+@rating.get('/api/v1/ratings/podcast')
+def list_podcast_ratings():
+    data = request.json
+    podcast_id = data.get('podcast_id')
+    try:
+        rating_list = Rating.query.filter_by(podcast_id=podcast_id).all()
+        rating_dict = [item.to_dict() for item in rating_list]
+        count = len(rating_list)
+        result = {'rating':rating_dict,'count':count}
+        return jsonify({'status': 'success', 'message': 'Retrieved rating podcast data', 'data': result}), 200
+    except Exception as e:
+        logger.error(f"Error retrieving podcast rating data: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Failed to retrieve podcast rating', 'error_code': 'SERVER_ERROR', 'data': None}), 500
+
+
+@rating.get('/api/v1/ratings/user')
+def list_user_ratings():
+    try:
+        rating_list = Rating.query.filter_by(user_id=current_user.id).all()
+        rating_dict = [item.to_dict() for item in rating_list]
+        count = len(rating_list)
+        result = {'rating':rating_dict,'count':count}
+        return jsonify({'status': 'success', 'message': 'Retrieved rating user data', 'data': result}), 200
+    except Exception as e:
+        logger.error(f"Error retrieving user rating data: {str(e)}")
+        return jsonify({'status': 'error', 'message': 'Failed to retrieve user  rating', 'error_code': 'SERVER_ERROR', 'data': None}), 500
+
 
 
 @rating.post('/api/v1/ratings')

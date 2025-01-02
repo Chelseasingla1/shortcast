@@ -2,10 +2,13 @@ from flask import Blueprint, request,jsonify
 import logging
 from models import db,Playlist
 from flask_login import current_user
+
+
+playlist = Blueprint("playlist", __name__)
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-playlist = Blueprint("playlist", __name__)
 @playlist.get('/api/v1/playlists')
 def list_playlists():
     """
@@ -23,10 +26,13 @@ def list_playlists():
                     items:
                         $ref: '#/definitions/Playlist'
     """
-    playlist_list: list[Playlist] = Playlist.query.filter_by(user_id=current_user.id)
-    playlist_list_dict = [item.to_dict() for item in playlist_list]
-    return jsonify({'status': 'success', 'message': 'got user private playlists', 'data': playlist_list_dict}), 201
+    playlist_list: list[Playlist] = Playlist.query.filter_by(user_id=current_user.id).all()
 
+    if playlist_list:
+        playlist_list_dict = [item.to_dict() for item in playlist_list]
+        return jsonify({'status': 'success', 'message': 'got user private playlists', 'data': playlist_list_dict}), 200
+    else:
+        return jsonify({'status': 'error', 'message': 'playlist is empty', 'data': None}), 404
 
 @playlist.get('/api/v1/playlists/<playlist_id>')
 def get_playlist(playlist_id):
@@ -130,6 +136,9 @@ def update_playlist(playlist_id):
     title = data.get('title')
     playlist_ = Playlist.query.get(playlist_id)
     if playlist_:
+        if playlist_.user_id != current_user.id:
+            return jsonify(
+                {'status': 'error', 'message': 'You are not authorized to delete this podcast', 'data': None}), 403
         if 'title' in data:
             playlist_.title = title
         try:
@@ -168,6 +177,9 @@ def delete_playlist(playlist_id):
         playlist_ = Playlist.query.get(playlist_id)
 
         if playlist_:
+            if playlist_.user_id != current_user.id:
+                return jsonify(
+                    {'status': 'error', 'message': 'You are not authorized to delete this podcast', 'data': None}), 403
             db.session.delete(playlist_)
             db.session.commit()
 

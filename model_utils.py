@@ -24,7 +24,9 @@ class Categories(Enum):
       CRIME = auto()
       TV_AND_FILM = auto()
 
-
+class Shared(Enum):
+    MODERATOR = auto()
+    CONSUMERS = auto()
 def role_check(role: str):
    if role == "ADMIN":
        return Roles.ADMIN
@@ -36,3 +38,9 @@ def provider_check(provider:str):
         return Providers.GITHUB
     elif provider == 'TWITCH':
         return Providers.TWITCH
+
+class FakeClient:
+    def __init__(self,user_id):
+        self.id = user_id
+        self.username = 'Jerry George'
+        self.is_authenticated = True

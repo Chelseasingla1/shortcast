@@ -2,10 +2,11 @@ from flask import Blueprint, request,jsonify
 from flask_login import current_user
 import logging
 from models import db,Episode,Podcast
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 episode = Blueprint("episode", __name__)
+
 @episode.get('/api/v1/episodes')
 def list_episodes():
     """
@@ -40,7 +41,7 @@ def list_episodes():
         episode_list_dict = [item.to_dict() for item in episode_list]
         return jsonify({'status': 'success', 'message': 'list of episodes', 'data': episode_list_dict}), 200
     else:
-        return jsonify({'status': 'error', 'message': 'podcast invalid', 'data': None}), 400
+        return jsonify({'status': 'error', 'message': 'episode is empty', 'data': None}), 404
 
 @episode.get('/api/v1/episodes/<episode_id>')
 def get_episode(episode_id):
@@ -97,7 +98,7 @@ def create_episode():
               in: body
               type: integer
               description: Duration of the episode (in seconds).
-              required: true
+              required: false
             - name: audio_url
               in: body
               type: string
@@ -179,6 +180,10 @@ def update_episode(episode_id):
     description = data.get('description')
     episode_ = Episode.query.get(episode_id)
     if episode_:
+        if episode_.podcast.user_id != current_user.id:
+            return jsonify(
+                {'status': 'error', 'message': 'You are not authorized to delete this podcast', 'data': None}), 403
+
         if 'title' in data:
             episode_.title = title
         if 'description' in data:
@@ -221,6 +226,10 @@ def delete_episode(episode_id):
         episode_ = Episode.query.get(episode_id)
 
         if episode_:
+            if episode_.podcast.user_id != current_user.id:
+                return jsonify(
+                    {'status': 'error', 'message': 'You are not authorized to delete this podcast', 'data': None}), 403
+
             db.session.delete(episode_)
             db.session.commit()
 

@@ -1,12 +1,16 @@
 from flask import Blueprint, request, jsonify
 import logging
+
+from flask_login import current_user
+
 from models import db, Podcast
 from model_utils import provider_check
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 podcast = Blueprint("podcast", __name__)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 @podcast.get('/api/v1/podcasts')
 def list_podcasts():
@@ -25,10 +29,17 @@ def list_podcasts():
                     items:
                         $ref: '#/definitions/Podcast'
     """
-    podcast_list = Podcast.query.all()
-    podcast_list_dict = [podcast.to_dict() for podcast in podcast_list]
-    return jsonify({'status': 'success', 'message': 'retrieved all podcasts', 'data': podcast_list_dict}), 200
-
+    try:
+        podcast_list = Podcast.query.all()
+        if podcast_list:
+            podcast_list_dict = [item.to_dict() for item in podcast_list]
+            return jsonify({'status': 'success', 'message': 'retrieved all podcasts', 'data': podcast_list_dict}), 200
+        else:
+            return jsonify({'status': 'error', 'message': 'Podcast is empty', 'data': None}), 404
+    except Exception as e:
+        logger.error(str(e))
+        return jsonify(
+            {'status': 'error', 'message': 'Failed to retrieve podcasts', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
 @podcast.get('/api/v1/podcasts/<int:podcast_id>')
 def get_podcast(podcast_id):
@@ -120,18 +131,25 @@ def create_podcast():
     title = data.get('title')
     description = data.get('description')
     category = str(data.get('category')).upper()
-    publisher = data.get('publisher')
+    publisher = current_user.username
     image_url = data.get('image_url')
     feed_url = data.get('feed_url')
     audio_url = data.get('audio_url')
     duration = data.get('duration')
 
-    if not title or not description or not category or not publisher or not audio_url:
+    if not title or not description or not category or not publisher:
         return jsonify({'status': 'error', 'message': 'Missing required fields', 'data': None}), 400
+    if feed_url and audio_url:
+        return jsonify({'status': 'error', 'message': 'Provide either feed_url or audio_url not both', 'data': None}), 400
 
     try:
-        new_podcast = Podcast(title=title, description=description, category=category, publisher=publisher,
-                              image_url=image_url, feed_url=feed_url, audio_url=audio_url, duration=duration)
+        new_podcast = None
+        if audio_url:
+            new_podcast = Podcast(title=title, description=description, category=category, publisher=publisher,
+                              image_url=image_url, audio_url=audio_url, duration=duration,user_id=current_user.id)
+        if feed_url:
+            new_podcast = Podcast(title=title, description=description, category=category, publisher=publisher,
+                                  image_url=image_url, feed_url=feed_url, duration=duration,user_id=current_user.id)
 
         db.session.add(new_podcast)
         db.session.commit()
@@ -184,6 +202,7 @@ def update_podcast(podcast_id):
             404:
                 description: Podcast not found.
     """
+
     data = request.json
     title = data.get('title')
     description = data.get('description')
@@ -192,6 +211,10 @@ def update_podcast(podcast_id):
 
     podcast_ = Podcast.query.get(podcast_id)
     if podcast_:
+        if podcast_.user_id != current_user.id:
+            return jsonify(
+                {'status': 'error', 'message': 'You are not authorized to update this podcast', 'data': None}), 403
+
         if 'title' in data:
             podcast_.title = title
         if 'description' in data:
@@ -207,7 +230,7 @@ def update_podcast(podcast_id):
             db.session.rollback()
             return jsonify({'status': 'error', 'message': str(e), 'data': None}), 500
 
-        return jsonify({'status': 'success', 'message': 'Podcast updated successfully!', 'data': podcast_.to_dict()}), 200
+        return jsonify({'status': 'success', 'message': 'Podcast updated successfully!', 'data': podcast_.to_dict()}), 201
     else:
         return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
 
@@ -237,9 +260,13 @@ def delete_podcast(podcast_id):
         podcast_ = Podcast.query.get(podcast_id)
 
         if podcast_:
+            if podcast_.user_id != current_user.id:
+                return jsonify(
+                    {'status': 'error', 'message': 'You are not authorized to delete this podcast', 'data': None}), 403
+
             db.session.delete(podcast_)
             db.session.commit()
-            return jsonify({'status': 'success', 'message': f'Podcast {podcast_id} deleted successfully!', 'data': None}), 200
+            return jsonify({'status': 'success', 'message': f'Podcast {podcast_id} deleted successfully!', 'data': None}), 201
         else:
             return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
     except Exception as e:
