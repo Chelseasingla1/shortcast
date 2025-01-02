@@ -1,12 +1,15 @@
+import os
+
 from flask import Blueprint, request,jsonify
-from flask_login import current_user
+from flask_login import current_user,login_required
 import logging
 from models import db,Episode,Podcast
-
+from webhook_security import verify_signature
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 episode = Blueprint("episode", __name__)
 
+@login_required
 @episode.get('/api/v1/episodes')
 def list_episodes():
     """
@@ -43,6 +46,7 @@ def list_episodes():
     else:
         return jsonify({'status': 'error', 'message': 'episode is empty', 'data': None}), 404
 
+@login_required
 @episode.get('/api/v1/episodes/<episode_id>')
 def get_episode(episode_id):
     """
@@ -73,7 +77,7 @@ def get_episode(episode_id):
     else:
         return jsonify({'status': 'error', 'message': 'episode not found', 'data':None}), 400
 
-
+@login_required
 @episode.post('/api/v1/episodes')
 def create_episode():
     """
@@ -117,12 +121,19 @@ def create_episode():
             404:
                 description: Podcast not found.
     """
+    payload = request.data.decode('utf-8')
+    signature = request.headers.get('X-Signature')
+    webhook_secret = os.environ.get('WEBHOOK_SECRET')
+    if not verify_signature(payload,signature,webhook_secret):
+        return jsonify({'status': 'error', 'message': 'Invalid signature'}), 403
     data = request.json
     title = data.get('title')
     description = data.get('description')
+    image_url = data.get('image_url')
     duration = data.get('duration')
     audio_url = data.get('audio_url')
     podcast_id = data.get('podcast_id')
+
 
     if not podcast_id:
         return jsonify({'status': 'error', 'message': 'podcast id not found','data':None}), 400
@@ -133,7 +144,7 @@ def create_episode():
         return jsonify({'status': 'error', 'message': 'Podcast not found','data':None}), 400
 
     try:
-        new_episode = Episode(title=title, description=description, audio_url=audio_url, podcast=podcast)
+        new_episode = Episode(title=title, description=description, audio_url=audio_url, podcast=podcast,image_url=image_url)
         db.session.add(new_episode)
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'created episode', 'data':None}), 201
@@ -143,7 +154,7 @@ def create_episode():
         return jsonify(
             {'status': 'error', 'message': 'episode not created', 'error_code': 'SERVER ERROR', 'data': None}), 500
 
-
+@login_required
 @episode.put('/api/v1/episodes/<int:episode_id>')
 def update_episode(episode_id):
     """
@@ -175,6 +186,11 @@ def update_episode(episode_id):
             404:
                 description: Episode not found.
     """
+    payload = request.data.decode('utf-8')
+    signature = request.headers.get('X-Signature')
+    webhook_secret = os.environ.get('WEBHOOK_SECRET')
+    if not verify_signature(payload, signature, webhook_secret):
+        return jsonify({'status': 'error', 'message': 'Invalid signature'}), 403
     data = request.json
     title = data.get('title')
     description = data.get('description')
@@ -200,7 +216,7 @@ def update_episode(episode_id):
     else:
         return jsonify({'status': 'error', 'message': 'episode not found','data':None}), 404
 
-
+@login_required
 @episode.delete('/api/v1/episodes/<int:episode_id>')
 def delete_episode(episode_id):
     """

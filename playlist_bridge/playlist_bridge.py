@@ -1,7 +1,7 @@
 from flask import request,jsonify,Blueprint
 from models import db,Playlist,PlaylistItem,PlaylistPlaylistitem
 import logging
-
+from  flask_login import login_required
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 playlist_item_bp = Blueprint('playlist_item', __name__)
 
 
-
+@login_required
 @playlist_item_bp.post('/api/v1/playlists/<int:playlist_id>/playlist_items')
 def add_playlist_item_to_playlist(playlist_id):
     """
@@ -66,7 +66,7 @@ def add_playlist_item_to_playlist(playlist_id):
         logger.error(f"Error adding PlaylistItem to Playlist {playlist_id}: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to add PlaylistItem to Playlist', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @playlist_item_bp.delete('/api/v1/playlists/<int:playlist_id>/playlist_items')
 def remove_playlist_item_from_playlist(playlist_id):
     """
@@ -126,7 +126,7 @@ def remove_playlist_item_from_playlist(playlist_id):
         logger.error(f"Error removing PlaylistItem from Playlist {playlist_id}: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to remove PlaylistItem from Playlist', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @playlist_item_bp.get('/api/v1/playlists/<int:playlist_id>/playlist_items')
 def list_playlist_items_in_playlist(playlist_id):
     """

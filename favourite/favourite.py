@@ -1,12 +1,13 @@
 from flask import Blueprint, request, jsonify
 import logging
 from models import db, Favourite
-from flask_login import current_user
+from flask_login import current_user,login_required
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 favourite = Blueprint("favourite", __name__)
 
+@login_required
 @favourite.get('/api/v1/favourites')
 def list_favourites():
     """
@@ -31,6 +32,7 @@ def list_favourites():
     favourite_list_dict = [item.to_dict() for item in favourite_list]
     return jsonify({'status': 'success', 'message': 'got downloads', 'data': favourite_list_dict}), 201
 
+@login_required
 @favourite.get('/api/v1/favourites/podcast')
 def favourites_podcast_count():
     data = request.json
@@ -46,7 +48,7 @@ def favourites_podcast_count():
             {'status': 'error', 'message': 'Failed to retrieve number of likes', 'error_code': 'SERVER_ERROR',
              'data': None}), 500
 
-
+@login_required
 @favourite.post('/api/v1/favourites')
 def add_podcast_to_favourite():
     """
@@ -93,7 +95,7 @@ def add_podcast_to_favourite():
         return jsonify({'status': 'error', 'message': 'favourite action failed', 'error_code': 'SERVER ERROR',
                         'data': None}), 500
 
-
+@login_required
 @favourite.delete('/api/v1/favourites')
 def remove_from_favourite():
     """

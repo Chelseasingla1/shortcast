@@ -2,12 +2,13 @@ from flask import Blueprint, request, jsonify
 import logging
 from models import User, db
 from model_utils import role_check
-from  flask_login import current_user
+from  flask_login import current_user,login_required
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 users = Blueprint("users", __name__)
 
+@login_required
 @users.get('/api/v1/users')
 def list_users():
     """
@@ -62,7 +63,7 @@ def list_users():
         logger.error(f"Error retrieving users: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve users', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @users.get('/api/v1/users')
 def get_user():
     """
@@ -218,7 +219,7 @@ def create_user():
         logger.error(f"Failed to add user: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to create user', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @users.put('/api/v1/users')
 def update_user():
     """

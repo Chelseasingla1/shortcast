@@ -105,7 +105,7 @@ class AzureBlobStorage(AzureStorage):
         with open(path_object_abs, "rb") as data:
             self.blob_client.upload_blob(data)
         logger.info(f"Blob '{blob_name}' uploaded successfully to container '{container_name}'.")
-
+        return self.blob_client.url
     def download_blob(self, container_name: str, blob_name: str, download_path: str,**kwargs):
         self.container_client = self.blob_service_client.get_container_client(container_name)
         self.blob_client = self.container_client.get_blob_client(blob_name)

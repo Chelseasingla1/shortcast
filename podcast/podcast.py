@@ -1,8 +1,8 @@
 from flask import Blueprint, request, jsonify
 import logging
-
-from flask_login import current_user
-
+from webhook_security import verify_signature
+from flask_login import current_user,login_required
+import os
 from models import db, Podcast
 from model_utils import provider_check
 
@@ -12,6 +12,7 @@ podcast = Blueprint("podcast", __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@login_required
 @podcast.get('/api/v1/podcasts')
 def list_podcasts():
     """
@@ -41,6 +42,7 @@ def list_podcasts():
         return jsonify(
             {'status': 'error', 'message': 'Failed to retrieve podcasts', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
+@login_required
 @podcast.get('/api/v1/podcasts/<int:podcast_id>')
 def get_podcast(podcast_id):
     """
@@ -70,7 +72,7 @@ def get_podcast(podcast_id):
     else:
         return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
 
-
+@login_required
 @podcast.post('/api/v1/podcasts')
 def create_podcast():
     """
@@ -145,6 +147,11 @@ def create_podcast():
     try:
         new_podcast = None
         if audio_url:
+            payload = request.data.decode('utf-8')
+            signature = request.headers.get('X-Signature')
+            webhook_secret = os.environ.get('WEBHOOK_SECRET')
+            if not verify_signature(payload, signature, webhook_secret):
+                return jsonify({'status': 'error', 'message': 'Invalid signature'}), 403
             new_podcast = Podcast(title=title, description=description, category=category, publisher=publisher,
                               image_url=image_url, audio_url=audio_url, duration=duration,user_id=current_user.id)
         if feed_url:
@@ -160,7 +167,7 @@ def create_podcast():
         logger.error(f"Error creating podcast: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Podcast not created', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @podcast.put('/api/v1/podcasts/<int:podcast_id>')
 def update_podcast(podcast_id):
     """
@@ -234,7 +241,7 @@ def update_podcast(podcast_id):
     else:
         return jsonify({'status': 'error', 'message': 'Podcast not found!', 'data': None}), 404
 
-
+@login_required
 @podcast.delete('/api/v1/podcasts/<int:podcast_id>')
 def delete_podcast(podcast_id):
     """
@@ -260,6 +267,14 @@ def delete_podcast(podcast_id):
         podcast_ = Podcast.query.get(podcast_id)
 
         if podcast_:
+            if podcast_.audio_url:
+                payload = request.data.decode('utf-8')
+                signature = request.headers.get('X-Signature')
+                webhook_secret = os.environ.get('WEBHOOK_SECRET')
+
+                if not verify_signature(payload, signature, webhook_secret):
+                    return jsonify({'status': 'error', 'message': 'Invalid signature'}), 403
+
             if podcast_.user_id != current_user.id:
                 return jsonify(
                     {'status': 'error', 'message': 'You are not authorized to delete this podcast', 'data': None}), 403

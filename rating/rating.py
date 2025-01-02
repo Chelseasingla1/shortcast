@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 import logging
 from models import db, Rating
-from flask_login import current_user
+from flask_login import current_user,login_required
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 rating = Blueprint("rating", __name__)
 
+@login_required
 @rating.get('/api/v1/ratings')
 def list_ratings():
     """
@@ -34,6 +35,7 @@ def list_ratings():
         logger.error(f"Error retrieving ratings: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve ratings', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
+@login_required
 @rating.get('/api/v1/ratings/podcast')
 def list_podcast_ratings():
     data = request.json
@@ -48,7 +50,7 @@ def list_podcast_ratings():
         logger.error(f"Error retrieving podcast rating data: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve podcast rating', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @rating.get('/api/v1/ratings/user')
 def list_user_ratings():
     try:
@@ -62,7 +64,7 @@ def list_user_ratings():
         return jsonify({'status': 'error', 'message': 'Failed to retrieve user  rating', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
 
-
+@login_required
 @rating.post('/api/v1/ratings')
 def rate_podcast_episode():
     """
@@ -107,7 +109,7 @@ def rate_podcast_episode():
         logger.error(f"Error rating podcast: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to rate podcast', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @rating.delete('/api/v1/ratings')
 def remove_rating():
     """

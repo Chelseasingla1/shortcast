@@ -1,12 +1,13 @@
 from flask import Blueprint, jsonify, request
 import logging
 from models import db, Subscription
-from flask_login import current_user
+from flask_login import current_user,login_required
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 subscription = Blueprint("subscription", __name__)
 
+@login_required
 @subscription.get('/api/v1/subscriptions')
 def list_subscriptions():
     """
@@ -35,6 +36,7 @@ def list_subscriptions():
         logger.error(f"Error retrieving subscriptions: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve subscriptions', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
+@login_required
 @subscription.get('/api/v1/subscriptions/podcast')
 def list_podcast_subscribers_count():
     data = request.json
@@ -48,7 +50,7 @@ def list_podcast_subscribers_count():
         logger.error(f"Error retrieving podcast subscriber count: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve podcast subscribers count', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @subscription.get('/api/v1/subscriptions/subscribed')
 def list_subscriber_subscribed():
     data = request.json
@@ -65,7 +67,7 @@ def list_subscriber_subscribed():
             {'status': 'error', 'message': 'Failed to retrieve podcast subscribers count', 'error_code': 'SERVER_ERROR',
              'data': None}), 500
 
-
+@login_required
 @subscription.post('/api/v1/subscriptions')
 def subscribe_to_podcast():
     """
@@ -109,7 +111,7 @@ def subscribe_to_podcast():
         logger.error(f"Error subscribing to podcast: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to subscribe to podcast', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @subscription.delete('/api/v1/subscriptions')
 def unsubscribe():
     """

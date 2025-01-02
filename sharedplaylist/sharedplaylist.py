@@ -2,12 +2,13 @@ from flask import Blueprint, request, jsonify
 import logging
 from models import db, SharedPlaylist
 from model_utils import Shared
-from flask_login import current_user
+from flask_login import current_user,login_required
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 shared_playlist = Blueprint("shared_playlist", __name__)
 
+@login_required
 @shared_playlist.get('/api/v1/shared_playlists')
 def list_shared_playlists():
     """
@@ -35,7 +36,7 @@ def list_shared_playlists():
     except Exception as e:
         logger.error(f"Error retrieving shared playlists: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve shared playlists', 'error_code': 'SERVER_ERROR', 'data': None}), 500
-
+@login_required
 @shared_playlist.get('/api/v1/shared_playlist_user')
 def list_user_shared_playlist():
     """
@@ -68,6 +69,7 @@ def list_user_shared_playlist():
         logger.error(f"Error retrieving shared playlists: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to retrieve shared playlists', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
+@login_required
 @shared_playlist.post('/api/v1/shared_playlists')
 def share_playlist():
     """
@@ -119,7 +121,7 @@ def share_playlist():
         logger.error(f"Error sharing playlist: {str(e)}")
         return jsonify({'status': 'error', 'message': 'Failed to share playlist', 'error_code': 'SERVER_ERROR', 'data': None}), 500
 
-
+@login_required
 @shared_playlist.delete('/api/v1/shared_playlists')
 def unshare_playlist():
     """

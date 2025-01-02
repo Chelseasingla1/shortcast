@@ -1,7 +1,7 @@
 from flask import Blueprint, request,jsonify
 import logging
 from models import db,Playlist
-from flask_login import current_user
+from flask_login import current_user,login_required
 
 
 playlist = Blueprint("playlist", __name__)
@@ -9,6 +9,8 @@ playlist = Blueprint("playlist", __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+@login_required
 @playlist.get('/api/v1/playlists')
 def list_playlists():
     """
@@ -34,6 +36,7 @@ def list_playlists():
     else:
         return jsonify({'status': 'error', 'message': 'playlist is empty', 'data': None}), 404
 
+@login_required
 @playlist.get('/api/v1/playlists/<playlist_id>')
 def get_playlist(playlist_id):
     """
@@ -63,7 +66,7 @@ def get_playlist(playlist_id):
     else:
         return jsonify({'status': 'error', 'message': 'playlist not found','data':None}), 404
 
-
+@login_required
 @playlist.post('/api/v1/playlists')
 def create_playlist():
     """
@@ -106,6 +109,7 @@ def create_playlist():
                         'data': None}), 500
 
 
+@login_required
 @playlist.put('/api/v1/playlists/<int:playlist_id>')
 def update_playlist(playlist_id):
     """
@@ -152,6 +156,7 @@ def update_playlist(playlist_id):
         return jsonify({'status': 'error', 'message': 'playlist not found', 'data': None}), 404
 
 
+@login_required
 @playlist.delete('/api/v1/playlists/<int:playlist_id>')
 def delete_playlist(playlist_id):
     """
