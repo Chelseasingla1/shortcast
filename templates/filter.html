@@ -1,0 +1,36 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">ShortCast</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="#">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#">Browse Episodes</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="#">Create Playlist</a>
+        </li>
+      </ul>
+      <form class="d-flex ms-auto" id="filterForm">
+        <select class="form-select" id="categoryFilter" aria-label="Filter by category">
+          <option selected value="">Filter by category</option>
+          <option value="technology">Technology</option>
+          <option value="health">Health</option>
+          <option value="education">Education</option>
+          <option value="entertainment">Entertainment</option>
+        </select>
+        <select class="form-select ms-2" id="dateFilter" aria-label="Filter by date">
+          <option selected value="">Filter by date</option>
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+        </select>
+        <button class="btn btn-primary ms-2" type="submit">Apply Filters</button>
+      </form>
+    </div>
+  </div>
+</nav>

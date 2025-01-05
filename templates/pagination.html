@@ -1,0 +1,135 @@
+<div class="container" data-aos="fade-up">
+  <div class="row">
+    <div class="col-md-12 text-center">
+      <div class="site-block-27">
+        <ul>
+          {% if pagination.has_prev %}
+            <li>
+              <a href="{{ url_for('views.episodes', page=pagination.prev_num) }}" class="icon-keyboard_arrow_left"></a>
+            </li>
+          {% else %}
+            <li class="disabled">
+              <span class="icon-keyboard_arrow_left"></span>
+            </li>
+          {% endif %}
+
+          {% for page_num in pagination.iter_pages() %}
+            {% if page_num %}
+              {% if page_num == pagination.page %}
+                <li class="active"><span>{{ page_num }}</span></li>
+              {% else %}
+                <li>
+                  <a href="{{ url_for('views.episodes', page=page_num) }}">{{ page_num }}</a>
+                </li>
+              {% endif %}
+            {% else %}
+              <li><span>...</span></li>
+            {% endif %}
+          {% endfor %}
+
+          {% if pagination.has_next %}
+            <li>
+              <a href="{{ url_for('views.episodes', page=pagination.next_num) }}" class="icon-keyboard_arrow_right"></a>
+            </li>
+          {% else %}
+            <li class="disabled">
+              <span class="icon-keyboard_arrow_right"></span>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+from flask import request
+
+@views_bp.route('/episodes')
+def episodes():
+    nav_links = [
+        {'text': 'Home', 'url': url_for('views.index'), 'active': False},
+        {'text': 'Episodes', 'url': url_for('views.episodes'), 'active': True},
+    ]
+    try:
+        # Get the 'page' query parameter, default to 1 if not provided
+        page = request.args.get('page', 1, type=int)
+        per_page = 8  # Number of episodes per page
+
+        # Query paginated episodes
+        pagination = Episode.query.order_by(Episode.publish_date.desc()).paginate(page=page, per_page=per_page)
+
+        episodes_list = [episode.to_dict() for episode in pagination.items]
+
+        return render_template(
+            'episodes.html',
+            logo_text="ShortCast",
+            nav_links=nav_links,
+            episodes=episodes_list,
+            pagination=pagination
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to retrieve paginated episodes: {str(e)}")
+        return render_template(
+            'episodes.html',
+            logo_text="ShortCast",
+            nav_links=nav_links,
+            episodes=[],
+            pagination=None
+        )
+
+
+@views_bp.post('/createplaylist')
+def create_post_playlist():
+    container_name = 'playlist'
+
+    # Retrieve form data
+    playlist_title = request.form.get('title')
+    description = request.form.get('description')
+    category = request.form.get('category')
+    duration = request.form.get('duration')
+    webhook_url = request.form.get('webhook_url')
+    webhook_type = request.form.get('webhook_type')
+
+    # Retrieve and validate file
+    file = request.files.get('image')
+    if not file or file.filename == '':
+        flash('No image file provided.', 'error')
+        return render_template('createplaylist.html')
+
+    # Secure file handling
+    filename = secure_filename(file.filename)
+    file_path = os.path.join('/tmp', filename)
+
+    try:
+        # Save the file temporarily
+        file.save(file_path)
+
+        # Upload to Azure Blob Storage
+        blob_name = f"images/{filename}"
+        image_url = azure_storage_instance.upload_blob(container_name, blob_name, file_path)
+
+        flash('Playlist created and image uploaded successfully!', 'success')
+
+        return render_template(
+            'createplaylist.html',
+            title=playlist_title,
+            description=description,
+            category=category,
+            image_url=image_url,
+            duration=duration,
+            webhook_url=webhook_url,
+            webhook_type=webhook_type
+        )
+
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        flash('An error occurred while creating the playlist. Please try again.', 'error')
+        return render_template('createplaylist.html')
+
+    finally:
+        # Clean up temporary file
+        if os.path.exists(file_path):
+            os.remove(file_path)

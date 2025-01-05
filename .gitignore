@@ -2,6 +2,6 @@
 .idea/
 .env
 __pycache__/
-auth/__pycache__/
+api/auth/__pycache__/
 instance/
 test.py

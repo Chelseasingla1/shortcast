@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+  <div class="container mt-5">
+    <h1>Episodes in Playlist: {{ playlist.name }}</h1>
+    
+    {% if episodes %}
+      <ul class="list-group">
+        {% for episode in episodes %}
+          <li class="list-group-item">
+            <h5>{{ episode.title }}</h5>
+            <p>{{ episode.description }}</p>
+            <a href="{{ url_for('views.episode_detail', episode_id=episode.id) }}" class="btn btn-primary">View Episode</a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No episodes in this playlist.</p>
+    {% endif %}
+  </div>
+{% endblock %}
