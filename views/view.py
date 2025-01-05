@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from api.azureops.azureapi import azure_storage_instance
 from views.helpers import get_authentication_links, PlaylistForm, EpisodeForm
 from flask_login import current_user
-
+from flask_login import login_required
 from models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem
 from api.azureops.azureclass import AzureBlobStorage
 
@@ -66,12 +66,12 @@ def index():
         shared_playlist=shared_playlists
     )
 
-
+@login_required
 @views_bp.route('/create-podcast')
 def create_podcast():
     return render_template('createpodcast.html')
 
-
+@login_required
 @views_bp.route('/create_episode', methods=['GET', 'POST'])
 def create_episode():
     form = EpisodeForm()
@@ -260,7 +260,7 @@ def episode():
 def live_podcast():
     return
 
-
+@login_required
 @views_bp.route('/createplaylist', methods=['GET', 'POST'])
 def create_playlist():
     form = PlaylistForm()  # Initialize the form
