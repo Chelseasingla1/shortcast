@@ -73,14 +73,14 @@ def index():
     )
 
 
-@login_required
 @views_bp.route('/create-podcast')
+@login_required
 def create_podcast():
     return render_template('createpodcast.html')
 
 
-@login_required
 @views_bp.route('/create_episode', methods=['GET', 'POST'])
+@login_required
 def create_episode():
     form = EpisodeForm()
 
@@ -167,7 +167,16 @@ def create_episode():
 
 @views_bp.route('/about')
 def about():
-    about_shortcast_message = "At ShortCast, we’re redefining the podcast experience with a focus on short-form, impactful content tailored for your busy lifestyle. Whether you’re commuting, taking a quick break, or simply looking to absorb valuable insights in bite-sized episodes, we’ve got you covered. Our platform brings together creators and listeners in a dynamic space where every moment counts and every story matters. From thought-provoking discussions to entertaining narratives, ShortCast keeps you informed, inspired, and entertained—no matter where you are. Join our growing community of podcast enthusiasts and discover fresh, engaging content right at your fingertips. With ShortCast, every second is an opportunity to learn, laugh, and connect."
+    about_shortcast_message = "At ShortCast, we’re redefining the podcast experience with a focus on short-form, " \
+                              "impactful content tailored for your busy lifestyle. Whether you’re commuting, " \
+                              "taking a quick break, or simply looking to absorb valuable insights in bite-sized " \
+                              "episodes, we’ve got you covered. Our platform brings together creators and listeners " \
+                              "in a dynamic space where every moment counts and every story matters. From " \
+                              "thought-provoking discussions to entertaining narratives, ShortCast keeps you " \
+                              "informed, inspired, and entertained—no matter where you are. Join our growing " \
+                              "community of podcast enthusiasts and discover fresh, engaging content right at your " \
+                              "fingertips. With ShortCast, every second is an opportunity to learn, laugh, " \
+                              "and connect. "
     return render_template('about.html', about_shortcast_message=about_shortcast_message)
 
 
@@ -234,6 +243,7 @@ def callback_route():
 
 
 @views_bp.route('/podcasts')
+@login_required
 def podcast():
     try:
 
@@ -276,6 +286,7 @@ def podcast():
 
 
 @views_bp.route('/episodes')
+@login_required
 def episode():
     try:
 
@@ -314,12 +325,13 @@ def episode():
 
 
 @views_bp.route('/live-podcasts')
+@login_required
 def live_podcast():
     return
 
 
-@login_required
 @views_bp.route('/createplaylist', methods=['GET', 'POST'])
+@login_required
 def create_playlist():
     form = PlaylistForm()  # Initialize the form
     if form.validate_on_submit():
@@ -379,6 +391,7 @@ def create_playlist():
 
 
 @views_bp.get('/playlists')
+@login_required
 def user_playlists():
     # Fetch all playlists belonging to the current user
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
@@ -397,6 +410,7 @@ def open_playlist(playlist_id):
 
 
 @views_bp.route('/add_to_playlist', methods=['POST'])
+@login_required
 def add_to_playlist():
     episode_id = request.form['episode_id']
     playlist_id = request.form['playlist_id']
@@ -425,6 +439,7 @@ def add_to_playlist():
 # Redirect back to the podcast page or wherever you want
 
 @views_bp.route('/playlist/<int:playlist_id>/episodes', methods=['GET'])
+@login_required
 def playlist_episodes(playlist_id):
     # Fetch the playlist by its ID
     playlist = Playlist.query.get(playlist_id)
@@ -442,6 +457,7 @@ def playlist_episodes(playlist_id):
 
 
 @views_bp.route('/delete_playlist/<int:playlist_id>', methods=['POST'])
+@login_required
 def delete_playlist(playlist_id):
     playlist = Playlist.query.get_or_404(playlist_id)
 

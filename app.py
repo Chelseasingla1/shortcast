@@ -59,6 +59,8 @@ app.register_blueprint(subscription)
 app.register_blueprint(users)
 app.register_blueprint(playlist_item_bp)
 
+login_manager.login_view = 'views.login'
+
 
 @app.errorhandler(401)
 def unauthorized(error):
