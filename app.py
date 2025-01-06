@@ -34,9 +34,15 @@ CORS(app)
 csrf = CSRFProtect(app)
 swagger = Swagger(app)
 
+database_name = os.environ.get('DATABASE_NAME')
+database_password = os.environ.get('DATABASE_PASSWORD')
+database_host = os.environ.get('DATABASE_HOST')
+database_user = os.environ.get('DATABASE_USER')
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY')
 app.config['WTF_CSRF_ENABLED'] = True
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///project.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{database_user}:{database_password}@{database_host}:5432/{database_name} '
+
+
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
 
 db.init_app(app)
