@@ -1,0 +1,24 @@
+       <div class="row">
+          {% for podcast in podcasts %}
+            <div class="col-md-4">
+              <div class="d-block podcast-entry bg-white mb-5" data-aos="fade-up">
+                <div class="image w-100" style="height: 300px; background-image: url('/static/images/img_2.jpg');"></div>
+                <div class="text w-100">
+                  <h3 class="font-weight-light"><a href="single-post.html">{{ podcast.title }}</a></h3>
+                  <div class="text-white mb-3"><span class="text-black-opacity-05"><small>By {{ podcast.publisher }} <span class="sep">/</span> {{ podcast.publish_date }} <span class="sep">/</span> {{ podcast.duration }}</small></span></div>
+                  <p class="mb-4">{{ podcast.description }}</p>
+
+                  <!-- Subscription Button -->
+                  <div class="share-icons mb-3">
+
+                      <button class="btn btn-success btn-lg">
+                <i class="fas fa-play"></i> Play
+                </button>
+
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>

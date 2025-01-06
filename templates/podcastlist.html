@@ -1,6 +1,22 @@
 {% extends 'base.html' %}
+{% block extrastylesheet %}
+    <style>
+    .custom-dropdown {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-width: 200px;
+}
 
+.custom-dropdown .dropdown-item {
+    padding: 6px 12px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+</style>
+{% endblock %}
 {% block content %}
+
 
 
   <div class="site-wrap">
@@ -23,12 +39,13 @@
                 <button class="btn btn-primary dropdown-toggle bg-dark" type="button" id="filterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                   Filter by Criteria
                 </button>
-                <div class="dropdown-menu" aria-labelledby="filterDropdown">
-                  <a class="dropdown-item" href="?category=Technology">By Category: Technology</a>
-                  <a class="dropdown-item" href="?category=Business">By Category: Business</a>
-                  <a class="dropdown-item" href="?category=Comedy">By Category: Comedy</a>
-                  <a class="dropdown-item" href="?">Clear Filters</a>
+               <div class="dropdown-menu custom-dropdown" aria-labelledby="filterDropdown">
+                    {% for category in categories %}
+                        <a class="dropdown-item" href="?category={{ category }}">By Category: {{ category }}</a>
+                    {% endfor %}
+                    <a class="dropdown-item" href="?">Clear Filters</a>
                 </div>
+
               </div>
 
               <!-- Collapsible Filter Section -->
@@ -75,9 +92,12 @@
                   <!-- Subscription Button -->
                   <div class="share-icons mb-3">
 
-                      <button class="btn btn-success btn-lg">
-                <i class="fas fa-play"></i> Play
-                </button>
+ <button class="btn btn-success btn-lg" style="width: 40%">
+    <a href="{{ url_for('views.episode', podcast_id=podcast.id) }}" style="color: white; text-decoration: none;">
+        <i class="fas fa-play"></i> Play
+    </a>
+</button>
+
 
                   </div>
 
@@ -144,3 +164,4 @@
   </div>
 
 {% endblock %}
+

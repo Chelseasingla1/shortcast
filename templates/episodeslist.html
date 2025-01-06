@@ -16,7 +16,8 @@
 
 
                  <!-- Search bar -->
-            <form method="GET" action="{{ url_for('views.podcast') }}">
+            <form method="GET" action="{{ url_for('views.episode') }}">
+                <input type="hidden" name="podcast_id" value="{{ podcast_id }}">
               <div class="input-group">
                 <div class="input-group-prepend">
                   <span class="input-group-text">Search</span>
@@ -24,18 +25,30 @@
                 <input type="text" class="form-control" name="title" value="{{ request.args.get('title', '') }}" placeholder="Search by Title">
               </div>
 
-              <!-- Dropdown for Filter Criteria -->
-              <div class="dropdown mt-4">
-                <button class="btn btn-primary dropdown-toggle bg-dark" type="button" id="filterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  Filter by Criteria
+           <div class="mt-3">
+                <button class="btn btn-secondary" type="button" data-toggle="collapse" data-target="#filterSection" aria-expanded="false" aria-controls="filterSection">
+                  Toggle Filters
                 </button>
-                <div class="dropdown-menu" aria-labelledby="filterDropdown">
-                  <a class="dropdown-item" href="?category=Technology">By Category: Technology</a>
-                  <a class="dropdown-item" href="?category=Business">By Category: Business</a>
-                  <a class="dropdown-item" href="?category=Comedy">By Category: Comedy</a>
-                  <a class="dropdown-item" href="?">Clear Filters</a>
+                <div class="collapse" id="filterSection">
+                  <div class="mt-3">
+                    <label for="min_duration">Min Duration (mins):</label>
+                    <input type="number" name="min_duration" id="min_duration" class="form-control" value="{{ request.args.get('min_duration', '') }}" placeholder="Min Duration">
+                  </div>
+                  <div class="mt-3">
+                    <label for="max_duration">Max Duration (mins):</label>
+                    <input type="number" name="max_duration" id="max_duration" class="form-control" value="{{ request.args.get('max_duration', '') }}" placeholder="Max Duration">
+                  </div>
+                  <div class="mt-3">
+                    <label for="start_date">Start Date:</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ request.args.get('start_date', '') }}">
+                  </div>
+                  <div class="mt-3">
+                    <label for="end_date">End Date:</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ request.args.get('end_date', '') }}">
+                  </div>
                 </div>
               </div>
+              <button type="submit" class="btn btn-primary mt-3 bg-dark"  >Apply Filters</button>
             </form>
 
 
@@ -52,6 +65,7 @@
         <div class="text w-100">
             <h3 class="font-weight-light">
                 <a href="single-post.html">{{ episode.title }}</a>
+
             </h3>
             <div class="text-white mb-3">
                 <span class="text-black-opacity-05">
@@ -67,37 +81,70 @@
                 <i class="fas fa-heart" id="favorite-icon-{{ loop.index }}" style="color: #bdc3c7; cursor: pointer;"></i>
             </div>
 
+
+
+                    <!-- Rating Section -->
+                    <div class="rating-container">
+    <div class="rating-stars" id="rating-1">
+        <i class="fas fa-star" data-index="1" style="cursor: pointer; color: #bdc3c7;"></i>
+        <i class="fas fa-star" data-index="2" style="cursor: pointer; color: #bdc3c7;"></i>
+        <i class="fas fa-star" data-index="3" style="cursor: pointer; color: #bdc3c7;"></i>
+        <i class="fas fa-star" data-index="4" style="cursor: pointer; color: #bdc3c7;"></i>
+        <i class="fas fa-star" data-index="5" style="cursor: pointer; color: #bdc3c7;"></i>
+    </div>
+    <div id="rating-value-1">Rating: 0/5</div>
+</div>
+
+
+
             <!-- Add to Playlist Button -->
-            <button class="btn btn-primary" data-toggle="modal" data-target="#playlistModal{{ loop.index }}">Add to Playlist</button>
+            <button class="btn btn-primary p-2" data-toggle="modal" data-target="#playlistModal{{ loop.index }}">
+
+                <i class="fas fa-list"></i>
+            </button>
 
             <!-- Modal for Playlist Selection -->
-            <div class="modal fade" id="playlistModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="playlistModalLabel{{ loop.index }}" aria-hidden="true">
-                <div class="modal-dialog" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="playlistModalLabel{{ loop.index }}">Choose Playlist</h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <!-- Playlist options to select from -->
-                            <ul class="list-group">
-                                {% for playlist in playlists %}
-                                    <li class="list-group-item">
-                                        <button class="btn btn-link" onclick="addToPlaylist({{ episode.id }}, {{ playlist.id }})">
-                                            {{ playlist.title }}
-                                        </button>
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
+
+       <div class="modal fade" id="playlistModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="playlistModalLabel{{ loop.index }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="playlistModalLabel{{ loop.index }}">
+                    <i class="fas fa-list"></i> Choose Playlist
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
+            <div class="modal-body">
+                <ul class="list-group">
+                    {% for playlist in playlists %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <i class="fas fa-music text-primary mr-2"></i>
+                               {{ playlist.title }}
+                            </span>
+
+
+                            <button class="btn btn-sm btn-outline-primary" onclick="addToPlaylist({{ episode.id }}, {{ playlist.id }})" id="addToPlaylist">
+                                <i class="fas fa-plus"></i> Add{{ playlist.id }}
+                            </button>
+
+
+
+
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
         </div>
     </div>
@@ -118,68 +165,99 @@
 {% endblock %}
 
  {% block otherscripts %}
-     <script>
-    function addToPlaylist(episodeId, playlistId) {
-        // Send AJAX request to Flask route to add episode to playlist
-        fetch(`/add_to_playlist/${episodeId}/${playlistId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token() }}'  // Include CSRF token for security
-            },
-            body: JSON.stringify({ episode_id: episodeId, playlist_id: playlistId })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Episode added to playlist!');
-            } else {
-                alert('Error adding episode to playlist.');
-            }
-        });
-    }
-</script>
+
 
 
  <script>
-    // Loop through each podcast entry to add event listeners for heart icon and rating stars
-    document.querySelectorAll('.favorite-icon').forEach((icon, index) => {
-        const heartIcon = icon.querySelector('.fas.fa-heart');
-        const ratingElement = document.getElementById(`rating-${index + 1}`);
-        const ratingValueDisplay = document.getElementById(`rating-value-${index + 1}`);
-        let rating = 0;
 
-        // Add click event listener to the heart icon to toggle favorite state
-        heartIcon.addEventListener('click', () => {
-            if (heartIcon.style.color === 'rgb(189, 195, 199)') {  // Default color (not favorited)
-                heartIcon.style.color = '#e74c3c'; // Red color (favorited)
+// Handle the "favorite" icon click
+document.querySelectorAll('.favorite-icon i').forEach(icon => {
+    icon.addEventListener('click', function() {
+        // Toggle the color of the heart icon
+        if (this.style.color === 'rgb(189, 195, 199)') { // Light grey color
+            this.style.color = '#e74c3c';  // Red when favorited
+        } else {
+            this.style.color = '#bdc3c7';  // Back to light grey
+        }
+
+        // Optionally, you can perform further actions, like saving the favorite status
+        // Example: send an AJAX request to save the user's favorite status to the server
+    });
+});
+
+// Handle the rating stars click
+document.querySelectorAll('.rating-stars i').forEach(star => {
+    star.addEventListener('click', function() {
+        const rating = parseInt(this.getAttribute('data-index'));
+        const ratingContainer = this.closest('.rating-container');
+        const stars = ratingContainer.querySelectorAll('.rating-stars i');
+        const ratingValue = ratingContainer.querySelector('#rating-value-1');
+
+        // Change the color of the stars based on the rating
+        stars.forEach((s, index) => {
+            if (index < rating) {
+                s.style.color = '#f39c12';  // Yellow for selected stars
             } else {
-                heartIcon.style.color = '#bdc3c7'; // Default color (not favorited)
+                s.style.color = '#bdc3c7';  // Light grey for unselected stars
             }
         });
 
-        // Add click event listener to each star
-        ratingElement.querySelectorAll('i').forEach(star => {
-            star.addEventListener('click', () => {
-                rating = star.getAttribute('data-index'); // Get the index of the clicked star
-                updateRatingDisplay(rating); // Update the rating display
-            });
-        });
+        // Update the rating value display
+        ratingValue.textContent = `Rating: ${rating}/5`;
 
-        // Update the displayed rating
-        function updateRatingDisplay(rating) {
-            // Change the text to display the selected rating
-            ratingValueDisplay.textContent = `Rating: ${rating}/5`;
-
-            // Highlight stars based on the rating
-            ratingElement.querySelectorAll('i').forEach(star => {
-                if (star.getAttribute('data-index') <= rating) {
-                    star.style.color = '#f39c12'; // Filled star
-                } else {
-                    star.style.color = '#bdc3c7'; // Empty star
-                }
-            });
-        }
+        // Optionally, you can perform further actions, like saving the rating to the server
+        // Example: send an AJAX request to save the user's rating to the server
     });
+});
+
+
+    function addToPlaylist(episode_id, playlist_id) {
+    // Get the CSRF token from the meta tag
+    const csrf_token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    // Create the data to send in the request body as JSON
+    const data = {
+        episode_id: episode_id,
+        playlist_id: playlist_id
+    };
+
+    // Send the POST request with the data
+    fetch('/add_to_playlist', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json', // Indicate that we're sending JSON data
+            'X-CSRFToken': csrf_token // Include the CSRF token
+        },
+        body: JSON.stringify(data) // Send the data as a JSON string
+    })
+        .then(response => {
+            if (response.status === 200) {
+                alert('Episode already exists in the playlist!');
+                return { status: 200, data: response.json() };
+            } else if (response.status === 201) {
+                alert('Episode added to the playlist successfully!');
+                return { status: 201, data: response.json() };
+            } else if (response.status === 400) {
+                throw new Error('Bad request. Please check the data and try again.');
+            } else if (response.status === 404) {
+                throw new Error('Playlist or episode not found.');
+            } else if (response.status === 500) {
+                alert('There is a slight inconvenience, please try again later.');
+                throw new Error('Server error occurred.');
+            } else {
+                throw new Error(`Unexpected response: ${response.status}`);
+            }
+        })
+        .then(async (result) => {
+            const data = await result.data; // Wait for the JSON to parse
+            console.log(data); // Log the response data (if needed)
+        })
+        .catch(error => {
+            // Handle errors
+            console.error('Error:', error);
+            alert(`Error: ${error.message}`);
+        });
+}
+
 </script>
  {% endblock %}

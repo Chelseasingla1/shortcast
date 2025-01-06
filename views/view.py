@@ -2,7 +2,7 @@ import os
 import uuid
 
 import requests
-from flask import Blueprint, render_template, request, url_for, session, redirect, flash
+from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify
 import logging
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,11 +12,13 @@ from datetime import datetime, timedelta
 from api.auth import login_user_
 from api.azureops.azureapi import azure_storage_instance
 from api.oauth.oauth import OauthFacade
-from views.helpers import get_authentication_links, PlaylistForm, EpisodeForm
+from model_utils import Categories
+from views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm
 from flask_login import current_user, logout_user
 from flask_login import login_required
 from models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem
 from api.azureops.azureclass import AzureBlobStorage
+from views.dbfuncs import add_episode_to_playlist
 
 load_dotenv()
 
@@ -246,7 +248,6 @@ def callback_route():
 @login_required
 def podcast():
     try:
-
         page = request.args.get('page', 1, type=int)
         per_page = 10
 
@@ -278,7 +279,10 @@ def podcast():
         pagination = query.order_by(Podcast.publish_date.desc()).paginate(page=page, per_page=per_page)
         podcasts = pagination.items  # This is the list of podcast items
 
-        return render_template('podcastlist.html', pagination=pagination, podcasts=podcasts, playlists=playlists)
+        category_names = [category.name for category in Categories]
+
+        return render_template('podcastlist.html', pagination=pagination, podcasts=podcasts, playlists=playlists,
+                               categories=category_names)
 
     except Exception as e:
         logger.error(f'Failed to retrieve paginated podcasts: {str(e)}')
@@ -289,10 +293,19 @@ def podcast():
 @login_required
 def episode():
     try:
-
         page = request.args.get('page', 1, type=int)
         per_page = 10
 
+        # Mandatory podcast_id filter
+        podcast_id = request.args.get('podcast_id', type=int)
+        if not podcast_id:
+            flash("Podcast ID is required to view episodes.", "danger")
+            return redirect(url_for('views.podcast'))
+
+        # Base query filtered by podcast_id
+        query = Episode.query.filter_by(podcast_id=podcast_id)
+
+        # Optional filters
         publisher = request.args.get('publisher')
         min_duration = request.args.get('min_duration', type=int)
         max_duration = request.args.get('max_duration', type=int)
@@ -300,8 +313,6 @@ def episode():
         start_date = request.args.get('start_date')
         end_date = request.args.get('end_date')
 
-        query = Episode.query
-        playlists = Playlist.query.filter_by(user_id=current_user.id).all()
         if publisher:
             query = query.filter(Episode.publisher.ilike(f"%{publisher}%"))
         if min_duration is not None:
@@ -313,11 +324,23 @@ def episode():
         if start_date and end_date:
             query = query.filter(Episode.publish_date.between(start_date, end_date))
 
-        # Apply pagination to the filtered query
+        # Pagination
         pagination = query.order_by(Episode.publish_date.desc()).paginate(page=page, per_page=per_page)
-        episodes = pagination.items  # This is the list of podcast items
+        episodes = pagination.items
 
-        return render_template('episodeslist.html', pagination=pagination, episodes=episodes, playlists=playlists)
+        playlists = Playlist.query.filter_by(user_id=current_user.id).all()
+
+        return render_template(
+            'episodeslist.html',
+            pagination=pagination,
+            episodes=episodes,
+            playlists=playlists,
+            podcast_id=podcast_id
+        )
+
+    except Exception as e:
+        flash(f"An error occurred: {e}", "danger")
+        return redirect(url_for('views.podcast'))
 
     except Exception as e:
         logger.error(f'Failed to retrieve paginated episodes: {str(e)}')
@@ -390,6 +413,46 @@ def create_playlist():
     return render_template('createplaylist.html', form=form)
 
 
+@views_bp.route('/removeplaylist/<int:playlist_id>', methods=['POST'])
+@login_required
+def remove_playlist(playlist_id):
+    try:
+        # Fetch the playlist to be deleted
+        playlist = Playlist.query.get(playlist_id)
+
+        if not playlist:
+            flash('Playlist not found.', 'error')
+            return redirect(url_for('views.user_playlists'))
+
+        # Ensure the playlist belongs to the current user
+        if playlist.user_id != current_user.id:
+            flash('You do not have permission to delete this playlist.', 'error')
+            return redirect(url_for('views.user_playlists'))
+
+        # Delete the image from Azure storage
+        if playlist.image_url:
+            blob_name = playlist.image_url.split('/')[-1]  # Extract the blob name
+            azure_storage_instance.delete_blob(container_name, f"images/{blob_name}")
+
+        # Remove the playlist from the database
+        db.session.delete(playlist)
+        db.session.commit()
+
+        flash('Playlist removed successfully!', 'success')
+        return redirect(url_for('views.user_playlists'))
+
+    except SQLAlchemyError as db_err:
+        db.session.rollback()
+        print(f"Database Error: {str(db_err)}")
+        flash('A database error occurred. Please try again.', 'error')
+
+    except Exception as e:
+        print(f"General Error: {str(e)}")
+        flash('An error occurred while removing the playlist. Please try again.', 'error')
+
+    return redirect(url_for('views.user_playlists'))
+
+
 @views_bp.get('/playlists')
 @login_required
 def user_playlists():
@@ -412,31 +475,129 @@ def open_playlist(playlist_id):
 @views_bp.route('/add_to_playlist', methods=['POST'])
 @login_required
 def add_to_playlist():
-    episode_id = request.form['episode_id']
-    playlist_id = request.form['playlist_id']
+    try:
+        # Parse JSON data from the request
+        data = request.json
 
-    # Ensure both episode and playlist exist
-    episode = Episode.query.get(episode_id)
-    playlist = Playlist.query.get(playlist_id)
+        if not data:
+            return jsonify({'msg': 'No data provided'}), 400
 
-    if not episode or not playlist:
-        return "Episode or Playlist not found", 404
+        episode_id = data.get('episode_id')
+        playlist_id = data.get('playlist_id')
 
-    # Create a new PlaylistItem with the Episode object
-    new_playlist_item = PlaylistItem(episode=episode)
-    db.session.add(new_playlist_item)
+        if not episode_id or not playlist_id:
+            return jsonify({'msg': 'episode_id and playlist_id are required'}), 400
 
-    # Create a new PlaylistPlaylistitem entry with both Playlist and PlaylistItem objects
-    new_playlist_playlist_item = PlaylistPlaylistitem(playlist=playlist, playlist_item=new_playlist_item)
-    db.session.add(new_playlist_playlist_item)
+        # Query the database for the playlist and episode
+        playlist = Playlist.query.get(playlist_id)
+        episode = Episode.query.get(episode_id)
 
-    # Commit changes to the database
-    db.session.commit()
+        if not playlist or not episode:
+            return jsonify({'msg': 'playlist or episode not found'}), 404
 
-    return redirect(url_for('views.podcast'))
+        if episode.playlist_items:
+            # Check if the playlist already contains the item
+            existing_item = PlaylistPlaylistitem.query.filter_by(
+                playlist_item_id=episode.playlist_items.id,
+                playlist_id=playlist_id
+            ).first()
+
+            if existing_item:
+                return jsonify({'msg': 'Episode already exists in playlist'}), 200
+
+            # Add the existing playlist item to the playlist
+            playlist_bridge = PlaylistPlaylistitem(
+                playlist_id=playlist_id,
+                playlist_item_id=episode.playlist_items.id
+            )
+            db.session.add(playlist_bridge)
+            db.session.commit()
+            return jsonify({'msg': 'Episode added to playlist successfully'}), 201
+        else:
+            # Create a new playlist item for the episode
+            new_playlist_item = PlaylistItem(episode_id=episode_id)
+            db.session.add(new_playlist_item)
+            db.session.flush()
+
+            # Add the new playlist item to the playlist
+            playlist_bridge = PlaylistPlaylistitem(
+                playlist_id=playlist_id,
+                playlist_item_id=new_playlist_item.id
+            )
+            db.session.add(playlist_bridge)
+            db.session.commit()
+
+            return jsonify({'msg': 'Episode added to playlist successfully'}), 201
+
+    except KeyError as e:
+        # Handle missing keys in the data
+        return jsonify({'msg': f'Missing key: {str(e)}'}), 400
+
+    except ValueError as e:
+        # Handle value-related errors
+        return jsonify({'msg': f'Value error: {str(e)}'}), 400
+
+    except Exception as e:
+        # Catch all other exceptions
+        return jsonify({'msg': f'An unexpected error occurred: {str(e)}'}), 500
 
 
-# Redirect back to the podcast page or wherever you want
+@views_bp.route('/remove_from_playlist', methods=['POST'])
+@login_required
+def remove_from_playlist():
+    try:
+        # Parse JSON data from the request
+        data = request.json
+
+        if not data:
+            return jsonify({'msg': 'No data provided'}), 400
+
+        episode_id = data.get('episode_id')
+        playlist_id = data.get('playlist_id')
+
+        if not episode_id or not playlist_id:
+            return jsonify({'msg': 'episode_id and playlist_id are required'}), 400
+
+        # Query the database for the playlist and episode
+        playlist = Playlist.query.get(playlist_id)
+        episode = Episode.query.get(episode_id)
+
+        if not playlist or not episode:
+            return jsonify({'msg': 'playlist or episode not found'}), 404
+
+        # Query the association table to check if the item exists
+        playlist_item_association = PlaylistPlaylistitem.query.filter_by(
+            playlist_id=playlist_id,
+            playlist_item_id=episode.playlist_items.id
+        ).first()
+
+        if not playlist_item_association:
+            return jsonify({'msg': 'Episode not found in the playlist'}), 404
+
+        # Remove the playlist item from the playlist
+        db.session.delete(playlist_item_association)
+
+        # If there are no other references to the playlist item, delete the playlist item itself
+        # You may need to add logic to ensure it's safe to delete (e.g., no other playlist associations exist)
+        if not PlaylistPlaylistitem.query.filter_by(playlist_item_id=episode.playlist_items.id).first():
+            db.session.delete(episode.playlist_items)
+
+        db.session.commit()
+
+        return jsonify({'msg': 'Episode removed from playlist successfully'}), 200
+
+    except KeyError as e:
+        # Handle missing keys in the data
+        return jsonify({'msg': f'Missing key: {str(e)}'}), 400
+
+    except ValueError as e:
+        # Handle value-related errors
+        return jsonify({'msg': f'Value error: {str(e)}'}), 400
+
+    except Exception as e:
+        # Catch all other exceptions
+        return jsonify({'msg': f'An unexpected error occurred: {str(e)}'}), 500
+
 
 @views_bp.route('/playlist/<int:playlist_id>/episodes', methods=['GET'])
 @login_required

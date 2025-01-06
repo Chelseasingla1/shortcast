@@ -1,12 +1,14 @@
 from api.oauth.oauth import OauthFacade
 from flask_wtf import FlaskForm
-from wtforms import StringField, FileField, TextAreaField, IntegerField, SelectField
+from wtforms import StringField, FileField, TextAreaField, IntegerField, SelectField, HiddenField
 from wtforms.validators import DataRequired, Optional, Length, URL
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
 def get_authentication_links():
     oauth_obj_twitch = OauthFacade('twitch', response_type="code",
                                    scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
@@ -33,7 +35,13 @@ class EpisodeForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired(), Length(min=1, max=100)])
     description = TextAreaField('Description', validators=[DataRequired(), Length(min=1, max=500)])
     duration = IntegerField('Duration (in seconds)', validators=[Optional()])
-    podcast_id = SelectField('Select Podcast', coerce=int, validators=[DataRequired()])  # Using SelectField for dropdown
-    image_file = FileField('Upload Image File',validators=[Optional()])
+    podcast_id = SelectField('Select Podcast', coerce=int,
+                             validators=[DataRequired()])  # Using SelectField for dropdown
+    image_file = FileField('Upload Image File', validators=[Optional()])
     audio_file = FileField('Upload Audio File', validators=[Optional()])
     publish_date = StringField('Publish Date', default=datetime.utcnow().isoformat(), validators=[Optional()])
+
+
+class AddToPlaylistForm(FlaskForm):
+    episode_id = HiddenField('Episode ID', validators=[DataRequired()])
+    playlist_id = HiddenField('Playlist ID', validators=[DataRequired()])

@@ -16,9 +16,15 @@
                     <a href="{{ url_for('views.open_playlist', playlist_id=playlist.id) }}" class="btn btn-primary">
                         Open Playlist
                     </a>
-                    <form action="{{ url_for('views.delete_playlist', playlist_id=playlist.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this playlist?')">
-                        <button type="submit" class="btn btn-danger mt-3">Delete Playlist</button>
-                     </form>
+
+                      <form action="{{ url_for('views.remove_playlist', playlist_id=playlist.id) }}" method="POST" style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this playlist?')">
+                                Delete Playlist
+                            </button>
+                        </form>
+
+
                 </div>
             </div>
         </div>
@@ -33,4 +39,12 @@
             </div>
     {% endif %}
 </div>
+{% endblock %}
+
+
+{% block otherscripts %}
+
+
+
+
 {% endblock %}
