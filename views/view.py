@@ -1,24 +1,30 @@
 import os
 import uuid
 
-from azure.storage.blob import BlobSasPermissions
+import requests
 from flask import Blueprint, render_template, request, url_for, session, redirect, flash
 import logging
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
+
+from api.auth import login_user_
 from api.azureops.azureapi import azure_storage_instance
+from api.oauth.oauth import OauthFacade
 from views.helpers import get_authentication_links, PlaylistForm, EpisodeForm
-from flask_login import current_user
+from flask_login import current_user, logout_user
 from flask_login import login_required
 from models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem
 from api.azureops.azureclass import AzureBlobStorage
 
 load_dotenv()
 
+GITHUB_CLIENT_ID = os.getenv('GITHUB_ID')
+GITHUB_CLIENT_SECRET = os.getenv('GITHUB_SECRET_KEY')
 connection_string = os.getenv('AZURE_CONNECTION_STRING')
 container_name = os.getenv('AZURE_CONTAINER_NAME')
+github_client_id = os.getenv('GITHUB_ID')
 azure_storage_instance = AzureBlobStorage(connection_string)
 
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +33,7 @@ logger = logging.getLogger(__name__)
 views_bp = Blueprint('views', __name__, static_folder='static', template_folder='templates')
 
 
-@views_bp.route('/')
+@views_bp.route('/', methods=['GET'])
 def index():
     nav_links = [
         {'text': 'Home', 'url': url_for('views.index'), 'active': True},
@@ -66,10 +72,12 @@ def index():
         shared_playlist=shared_playlists
     )
 
+
 @login_required
 @views_bp.route('/create-podcast')
 def create_podcast():
     return render_template('createpodcast.html')
+
 
 @login_required
 @views_bp.route('/create_episode', methods=['GET', 'POST'])
@@ -78,7 +86,6 @@ def create_episode():
 
     # Fetch the list of podcasts that belong to the current user
     podcasts = Podcast.query.filter_by(user_id=current_user.id).all()
-
 
     # Populate the podcast dropdown with podcast titles and IDs
     form.podcast_id.choices = [(podcast.id, podcast.title) for podcast in podcasts]
@@ -158,10 +165,10 @@ def create_episode():
     return render_template('createepisodes.html', form=form, podcasts=podcasts)
 
 
-
 @views_bp.route('/about')
 def about():
-    return render_template('about.html')
+    about_shortcast_message = "At ShortCast, we’re redefining the podcast experience with a focus on short-form, impactful content tailored for your busy lifestyle. Whether you’re commuting, taking a quick break, or simply looking to absorb valuable insights in bite-sized episodes, we’ve got you covered. Our platform brings together creators and listeners in a dynamic space where every moment counts and every story matters. From thought-provoking discussions to entertaining narratives, ShortCast keeps you informed, inspired, and entertained—no matter where you are. Join our growing community of podcast enthusiasts and discover fresh, engaging content right at your fingertips. With ShortCast, every second is an opportunity to learn, laugh, and connect."
+    return render_template('about.html', about_shortcast_message=about_shortcast_message)
 
 
 @views_bp.route('/contact')
@@ -174,6 +181,56 @@ def login():
     auth_link = get_authentication_links()
 
     return render_template("login-register.html", auth_links=auth_link)
+
+
+@views_bp.route('/callback')
+def callback_route():
+    code = request.args.get('code')
+    state = request.args.get('state')
+    scope = request.args.get('scope')
+    client = request.args.get('client')
+    error = request.args.get('error')
+    error_description = request.args.get('error_description')
+
+    logger.info(f'This is client: {client}')
+
+    if error:
+        logger.error(f'Error during OAuth callback: {error_description}')
+        flash(f'Error: {error_description}', 'error')
+        return redirect(url_for('views.login'))
+
+    if code:
+        data = {'code': code, 'state': state, 'scope': scope}
+        try:
+            oauth_obj = OauthFacade(client=client, response_type="code", scope=["user:read:email"])
+            access_token = oauth_obj.get_access_token(data=data)
+            access_data = {'access_token': access_token, 'client': client}
+            session['oauth_token_data'] = access_data
+            logger.info(f'Saved token: {access_token}')
+
+            response = login_user_()
+            status_code = response[1] if isinstance(response, tuple) else response
+            logger.info(response)
+            if status_code == 201:
+                flash('Logged in successfully!', 'success')
+                return redirect(url_for('views.podcast'))
+            elif hasattr(response, 'status') and response.status == 'error':
+                flash('Failed to log in.', 'error')
+                return redirect(url_for('views.login'))
+
+            else:
+                logger.warning('Unexpected login response.')
+                flash('An unexpected error occurred during login.', 'error')
+                return redirect(url_for('views.login'))
+
+        except Exception as e:
+            logger.exception('Failed during token handling.')
+            flash('An error occurred during authentication.', 'error')
+            return redirect(url_for('views.login'))
+
+    # Fallback for any unexpected scenario
+    flash('Invalid or missing code parameter.', 'error')
+    return redirect(url_for('views.login'))
 
 
 @views_bp.route('/podcasts')
@@ -259,6 +316,7 @@ def episode():
 @views_bp.route('/live-podcasts')
 def live_podcast():
     return
+
 
 @login_required
 @views_bp.route('/createplaylist', methods=['GET', 'POST'])
@@ -396,9 +454,38 @@ def delete_playlist(playlist_id):
 
     return redirect(url_for('views.podcasts'))  # Redirect to the list of podcasts or playlists
 
-# @views_bp.route('/contact')
-# def contact():
-#     return render_template('contact.html')
+
+@views_bp.route('/logout')
+def logout():
+    logger.info('User initiated logout.')
+
+    flash('You have been logged out successfully.', 'success')
+
+    access_data = session.pop('oauth_token_data', None)
+    if access_data and 'access_token' in access_data:
+        try:
+            token = access_data['access_token']
+
+            response = requests.delete(
+                f'https://api.github.com/applications/{GITHUB_CLIENT_ID}/grant',
+                auth=(GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET),
+                json={"access_token": token}
+            )
+
+            if response.status_code == 204:
+                logger.info('GitHub OAuth token successfully invalidated.')
+            else:
+                logger.warning(
+                    f'Failed to invalidate GitHub OAuth token. Status: {response.status_code}, Response: {response.text}'
+                )
+
+        except Exception as e:
+            logger.exception('Error while invalidating GitHub OAuth token.')
+
+    logout_user()
+    session.clear()
+
+    return redirect(url_for('views.index'))
 #
 #
 # @views_bp.route('/login')
@@ -423,50 +510,8 @@ def delete_playlist(playlist_id):
 # def single_post():
 #     return render_template('single-post.html')
 #
-#
-# @views_bp.route('/callback')
-# def callback_route():
-#     code = request.args.get('code')
-#     state = request.args.get('state')
-#     scope = request.args.get('scope')
-#     client = request.args.get('client')
-#     error = request.args.get('error')
-#     error_description = request.args.get('error_description')
-#
-#     logger.info(f'This is client: {client}')
-#
-#     if error:
-#         logger.error(f'Error during OAuth callback: {error_description}')
-#         flash(f'Error: {error_description}', 'error')
-#         return redirect(url_for('views.login_route'))
-#
-#     if code:
-#         data = {'code': code, 'state': state, 'scope': scope}
-#         try:
-#             oauth_obj = OauthFacade(client=client, response_type="code", scope=["user:read:email"])
-#             access_token = oauth_obj.get_access_token(data=data)
-#             access_data = {'access_token': access_token, 'client': client}
-#             session['oauth_token_data'] = access_data
-#             logger.info(f'Saved token: {access_token}')
-#
-#             response = login_user_()[1]
-#             print(response)
-#             if response == 201:
-#                 flash('Logged in successfully!', 'success')
-#                 return redirect(url_for('podcast'))
-#             elif response.status == 'error':
-#                 flash('Failed to log in.', 'error')
-#                 return redirect(url_for('views.login_route'))
-#
-#         except Exception as e:
-#             logger.error(f'Failed token handling: {e}')
-#             flash('An error occurred during authentication.', 'error')
-#             return redirect(url_for('views.login_route'))
-#
-#     # Fallback for any unexpected scenario
-#     flash('Invalid or missing code parameter.', 'error')
-#     return redirect(url_for('views.login_route'))
-#
+
+
 # @views_bp.route('/podcasts')
 # def pocast():
 #     return render_template('podcastlist.html')

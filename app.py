@@ -37,7 +37,6 @@ swagger = Swagger(app)
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY')
 app.config['WTF_CSRF_ENABLED'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///project.db'
-# app.config['SQLALCHEMY_ECHO'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
 
 db.init_app(app)
@@ -61,13 +60,15 @@ app.register_blueprint(users)
 app.register_blueprint(playlist_item_bp)
 
 
-
-
-
 @app.errorhandler(401)
 def unauthorized(error):
     logger.info(error)
     return jsonify({'status': 'failed', 'error': 'You need to be logged in to access this resource'}), 401
+
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 
 @login_manager.user_loader
@@ -83,4 +84,4 @@ def med():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(host="0.0.0.0",port=8000)
+    app.run(host="0.0.0.0", port=8000)

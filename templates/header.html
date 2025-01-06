@@ -15,7 +15,7 @@
 
 
           <div class="col-3">
-            <h1 class="site-logo"><a href="index.html" class="h2">Shortcast<span class="text-primary">.</span> </a></h1>
+            <h1 class="site-logo"><a href="{{ url_for("views.index") }}" class="h2">Shortcast<span class="text-primary">.</span> </a></h1>
           </div>
           <div class="col-9">
             <nav class="site-navigation position-relative text-right text-md-right" role="navigation">
@@ -25,24 +25,35 @@
               <div class="d-block d-lg-none ml-md-0 mr-auto"><a href="#" class="site-menu-toggle js-menu-toggle text-black"><span class="icon-menu h3"></span></a></div>
 
               <ul class="site-menu js-clone-nav d-none d-lg-block">
-                <li class="active">
+                <li class="{% if request.endpoint == 'views.index' %}active{% endif %}">
                   <a href="{{ url_for("views.index") }}">Home</a>
                 </li>
-                <li class="has-children">
-                  <a href="#">Create</a>
-                  <ul class="dropdown arrow-top">
-                    <li><a href="{{ url_for("views.create_podcast") }}">Podcast</a></li>
-                    <li><a href="{{ url_for("views.create_episode") }}">Episode</a></li>
-                  </ul>
+
+             <li class="has-children {% if request.endpoint in ['views.create_podcast', 'views.create_episode'] %}active{% endif %}">
+                <a href="#">Create</a>
+                 <ul class="dropdown arrow-top">
+                    <li class="{% if request.endpoint == 'views.create_podcast' %}active{% endif %}">
+                        <a href="{{ url_for('views.create_podcast') }}">Podcast</a>
+                    </li>
+                     <li class="{% if request.endpoint == 'views.create_episode' %}active{% endif %}">
+                        <a href="{{ url_for('views.create_episode') }}">Episode</a>
+                    </li>
+                </ul>
+            </li>
+
+              <li class="{% if request.endpoint == 'views.about' %}active{% endif %}">
+                    <a href="{{ url_for('views.about') }}">About</a>
                 </li>
-                <li><a href="{{ url_for("views.about") }}">About</a></li>
-                <li><a href="{{ url_for("views.contact") }}">Contact</a></li>
+
+                <li class="{% if request.endpoint == 'views.contact' %}active{% endif %}">
+                    <a href="{{ url_for('views.contact') }}">Contact</a>
+                </li>
 
                   {% if current_user.is_authenticated %}
-                        <li><a href="{{ url_for("views.create_playlist") }}">Create playlist</a></li
+                        <li><a href="{{ url_for("views.create_playlist") }}">Create playlist</a></li>
                        <img src="{{ current_user.profile_image_url|safe }}" alt="User Avatar" class="rounded-circle" width="60" height="60">
                   {% else %}
-                <li><a href="{{ url_for("views.login") }}">Login / Register</a></li>
+                <li class="{% if request.endpoint == 'views.login' %}active{% endif %}"><a href="{{ url_for("views.login") }}">Login / Register</a></li>
                   {% endif %}
 
               </ul>
