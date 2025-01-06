@@ -41,13 +41,36 @@
                 </ul>
             </li>
 
-              <li class="{% if request.endpoint == 'views.about' %}active{% endif %}">
-                    <a href="{{ url_for('views.about') }}">About</a>
-                </li>
 
-                <li class="{% if request.endpoint == 'views.contact' %}active{% endif %}">
-                    <a href="{{ url_for('views.contact') }}">Contact</a>
-                </li>
+
+
+
+
+               <li class="has-children {% if request.endpoint in ['views.about', 'views.contact'] %}active{% endif %}">
+                <a href="#">Info</a>
+                 <ul class="dropdown arrow-top">
+                    <li class="{% if request.endpoint == 'views.about' %}active{% endif %}">
+                        <a href="{{ url_for('views.about') }}">About</a>
+                    </li>
+                     <li class="{% if request.endpoint == 'views.contact' %}active{% endif %}">
+                        <a href="{{ url_for('views.contact') }}">Contact</a>
+                    </li>
+                </ul>
+            </li>
+
+
+               <li class="has-children {% if request.endpoint in ['views.podcast', 'views.live_podcast'] %}active{% endif %}">
+                <a href="#">Browse</a>
+                 <ul class="dropdown arrow-top">
+                    <li class="{% if request.endpoint == 'views.podcast' %}active{% endif %}">
+                        <a href="{{ url_for('views.podcast') }}">Podcast</a>
+                    </li>
+                     <li class="{% if request.endpoint == 'views.live_podcast' %}active{% endif %}">
+                        <a href="{{ url_for('views.live_podcast') }}">Live Podcast</a>
+                    </li>
+                </ul>
+            </li>
+
 
                   {% if current_user.is_authenticated %}
                         <li><a href="{{ url_for("views.create_playlist") }}">Create playlist</a></li>
@@ -56,7 +79,14 @@
                 <li class="{% if request.endpoint == 'views.login' %}active{% endif %}"><a href="{{ url_for("views.login") }}">Login / Register</a></li>
                   {% endif %}
 
+                <li class="{% if request.endpoint == 'views.logout' %}active{% endif %}">
+                    <a href="{{ url_for('views.logout') }}">Logout</a>
+                </li>
+
+
               </ul>
+
+
             </nav>
 
 
