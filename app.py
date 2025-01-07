@@ -1,5 +1,5 @@
 import os, logging
-from datetime import timedelta,datetime
+from datetime import timedelta, datetime
 from flask import Flask, jsonify, render_template
 from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
@@ -38,10 +38,11 @@ database_name = os.environ.get('DATABASE_NAME')
 database_password = os.environ.get('DATABASE_PASSWORD')
 database_host = os.environ.get('DATABASE_HOST')
 database_user = os.environ.get('DATABASE_USER')
+database_connection = os.environ.get('DATABASE_URI_SHORTCAST')
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY')
 app.config['WTF_CSRF_ENABLED'] = True
-app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{database_user}:{database_password}@{database_host}:5432/{database_name} '
-
+app.config['SQLALCHEMY_DATABASE_URI'] = database_connection
+print(database_connection)
 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
 
@@ -66,8 +67,6 @@ app.register_blueprint(users)
 app.register_blueprint(playlist_item_bp)
 
 login_manager.login_view = 'views.login'
-
-
 
 
 @app.errorhandler(401)

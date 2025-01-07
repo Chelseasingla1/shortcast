@@ -1,8 +1,8 @@
-"""empty message
+"""first migration
 
-Revision ID: fd84a34fa3b2
+Revision ID: 1ea5793b1366
 Revises: 
-Create Date: 2025-01-05 08:53:56.823733
+Create Date: 2025-01-07 09:08:28.647250
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = 'fd84a34fa3b2'
+revision = '1ea5793b1366'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -26,7 +26,7 @@ def upgrade():
     sa.Column('profile_image_url', sa.String(), nullable=False),
     sa.Column('email', sa.String(), nullable=True),
     sa.Column('role', sa.Enum('ADMIN', 'USER', name='roles'), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('oauth_id')
     )
@@ -34,7 +34,8 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('uq_playlist_title', sa.String(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('image_url', sa.String(), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_user_playlist'),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('uq_playlist_title')
@@ -45,7 +46,7 @@ def upgrade():
     sa.Column('description', sa.String(), nullable=False),
     sa.Column('category', sa.Enum('ARTS_AND_CULTURE', 'BUSINESS', 'COMEDY', 'EDUCATION', 'FICTION', 'HEALTH_AND_FITNESS', 'KIDS_AND_FAMILY', 'LEISURE', 'NEWS_AND_POLITICS', 'RELIGION', 'SCIENCE', 'SOCIETY', 'SPORTS', 'CRIME', 'TV_AND_FILM', name='categories'), nullable=False),
     sa.Column('publisher', sa.String(), nullable=False),
-    sa.Column('publish_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('publish_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('image_url', sa.String(), nullable=True),
     sa.Column('uq_podcast_feed_url', sa.String(), nullable=True),
     sa.Column('uq_podcast_audio_url', sa.String(), nullable=True),
@@ -61,7 +62,7 @@ def upgrade():
     sa.Column('title', sa.String(), nullable=False),
     sa.Column('description', sa.String(), nullable=False),
     sa.Column('duration', sa.Integer(), nullable=True),
-    sa.Column('publish_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('publish_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('image_url', sa.String(), nullable=True),
     sa.Column('uq_episode_audio_url', sa.String(), nullable=False),
     sa.Column('podcast_id', sa.Integer(), nullable=False),
@@ -80,7 +81,7 @@ def upgrade():
     op.create_table('subscription',
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('podcast_id', sa.Integer(), nullable=False),
-    sa.Column('subscribed_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('subscribed_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['podcast_id'], ['podcast.id'], name='fk_podcast_subscription'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_user_subscription'),
     sa.PrimaryKeyConstraint('user_id', 'podcast_id')
@@ -89,7 +90,7 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('podcast_id', sa.Integer(), nullable=True),
     sa.Column('episode_id', sa.Integer(), nullable=True),
-    sa.Column('download_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('download_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['episode_id'], ['episode.id'], name='fk_episode_download'),
     sa.ForeignKeyConstraint(['podcast_id'], ['podcast.id'], name='fk_podcast_download'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_user_download'),
@@ -99,7 +100,7 @@ def upgrade():
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('podcast_id', sa.Integer(), nullable=True),
     sa.Column('episode_id', sa.Integer(), nullable=True),
-    sa.Column('added_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('added_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['episode_id'], ['episode.id'], name='fk_episode_favourite'),
     sa.ForeignKeyConstraint(['podcast_id'], ['podcast.id'], name='fk_podcast_favourite'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_user_favourite'),
@@ -109,7 +110,7 @@ def upgrade():
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('podcast_id', sa.Integer(), nullable=True),
     sa.Column('episode_id', sa.Integer(), nullable=True),
-    sa.Column('added_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('added_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['episode_id'], ['episode.id'], name='fk_episode_playlist_item'),
     sa.ForeignKeyConstraint(['podcast_id'], ['podcast.id'], name='fk_podcast_playlist_item'),
     sa.PrimaryKeyConstraint('id')
@@ -120,7 +121,7 @@ def upgrade():
     sa.Column('episode_id', sa.Integer(), nullable=True),
     sa.Column('rating', sa.SmallInteger(), nullable=False),
     sa.Column('review_text', sa.String(), nullable=True),
-    sa.Column('review_date', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('review_date', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['episode_id'], ['episode.id'], name='fk_episode_rating'),
     sa.ForeignKeyConstraint(['podcast_id'], ['podcast.id'], name='fk_podcast_rating'),
     sa.ForeignKeyConstraint(['user_id'], ['user.id'], name='fk_user_rating'),
