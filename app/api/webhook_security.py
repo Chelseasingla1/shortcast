@@ -2,6 +2,7 @@ import hmac
 import hashlib
 import base64
 
+
 def generate_signature(payload, secret):
     return base64.b64encode(hmac.new(secret.encode(), payload.encode(), hashlib.sha256).digest())
 

@@ -21,14 +21,15 @@
         <div class="row">
           <div class="col-md-12">
             <h3>Create a Playlist</h3>
-         <form action="/createplaylist" method="POST" enctype="multipart/form-data">
+
+         <form action="{{url_for('views.create_playlist')}}" method="POST" enctype="multipart/form-data">
     {{ form.csrf_token() }}
     <div class="form-group">
-        <label for="playlist-name">Playlist Name</label>
+        <label >Playlist Name</label>
         {{ form.title(class="form-control", id="playlist-name", required=True) }}
     </div>
     <div class="form-group">
-        <label for="validatedFileInput">Upload your playlist image</label>
+        <label>Upload your playlist image</label>
         {{ form.image(class="form-control", id="validatedFileInput", required=True, accept="image/*") }}
     </div>
     <button type="submit" class="btn btn-primary">Create Playlist</button>

@@ -1,24 +1,27 @@
 import os
 import uuid
-
 import requests
 from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify
 import logging
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
+from datetime import datetime
+
+from celery.result import AsyncResult
 
 from app.api.auth import login_user_
 from app.api.azureops.azureapi import azure_storage_instance
 from app.api.oauth.oauth import OauthFacade
 from app.model_utils import Categories
-from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm, PodcastForm
+from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm, PodcastForm, \
+    EmailForm
 from flask_login import current_user, logout_user
 from flask_login import login_required
 from app.models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem
 from app.api.azureops.azureclass import AzureBlobStorage
 from app.views.dbfuncs import add_episode_to_playlist
+from app.views.emailservice import send_verification_email
 
 load_dotenv()
 
@@ -51,6 +54,7 @@ def index():
     top_podcasts = []
     latest_episodes = []
     shared_playlists = []
+    email_form = EmailForm()
     try:
         top_podcasts = Podcast.query.limit(10).all()
         filter_top_podcasts = sorted(top_podcasts, key=lambda top: len(top.subscriptions), reverse=True)
@@ -61,7 +65,7 @@ def index():
         latest_episodes = [episode.to_dict() for episode in latest_episodes]
         top_podcasts = [podcast.to_dict() for podcast in filter_top_podcasts]
 
-        shared_playlists = [shared_playlists.to_dict() for shared_playlist in shared_playlists]
+        shared_playlists = [shared_playlist.to_dict() for shared_playlist in shared_playlists]
     except Exception as e:
         logger.error(f"Failed to retrieve top podcasts: {str(e)}")
 
@@ -71,22 +75,23 @@ def index():
         nav_links=nav_links,
         top_podcast=top_podcasts,
         latest_episodes=latest_episodes,
-        shared_playlist=shared_playlists
+        shared_playlist=shared_playlists,
+        email_form=email_form
     )
 
-
-@views_bp.route('/create-podcast')
+# Route to create a new podcast
+@views_bp.route('/create-podcast',methods=['GET','POST'])
 @login_required
 def create_podcast():
     form = PodcastForm()
-
+    form.category.choices = [(category.name, category.name.replace('_', ' ').title()) for category in Categories]
+    email_form = EmailForm()
     if form.validate_on_submit():
         logging.info("Form is valid, processing data")
         title = form.title.data
         description = form.description.data
         category = form.category.data
         duration = form.duration.data
-        feed_url = form.feed_url.data
         if form.image_file.data:
             image_file = form.image_file.data
             original_filename = secure_filename(image_file.filename)
@@ -101,54 +106,70 @@ def create_podcast():
             except Exception as e:
                 flash(f"Error uploading image: {e}", "error")
                 return render_template('createpodcast.html', form=form)
-
+            # Removes uploaded image
             if os.path.exists(file_path):
                 os.remove(file_path)
 
-            new_podcast = Podcast(
-                title=title,
-                description=description,
-                image_url=image_url if image_url else None,
-                category=category,
-                duration=duration if duration else None,
-                feed_url=feed_url
-            )
+
 
             try:
+                new_podcast = Podcast(
+                    title=title,
+                    description=description,
+                    image_url=image_url if image_url else None,
+                    category=category,  # find a way to make it accept multi values,probably make a category table
+                    publisher=current_user.username,
+                    duration=duration if duration else None,
+                    user_id = current_user.id
+
+                )
+
+                website_hostname = os.getenv('WEBSITE_HOSTNAME')
                 db.session.add(new_podcast)
+                db.session.flush()
+                new_podcast.feed_url = f"{website_hostname}/podcasts/{new_podcast.id}/feed"
+                new_podcast.validate_urls()
                 db.session.commit()
-                logging.info("Podcast created successfully!")
+                logger.info("Podcast created successfully!")
                 flash('Podcast created successfully!', 'success')
-                return redirect(url_for('views.podcasts'))
-            except Exception as e:
+                return redirect(url_for('views.podcast'))
+            except SQLAlchemyError as e:
                 db.session.rollback()
-                logging.error(f"Error saving episode: {e} rolled database ")
+                logger.error(f"Error saving episode: {e} rolled database ")
                 azure_storage_instance.delete_blob(container_name, blob_name)
                 logger.error('deleted data from azure')
                 flash(f"Error saving episode: {e}", "error")
-                return render_template('createpodcast.html', form=form)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Error saving episode: {e} rolled database ")
+                azure_storage_instance.delete_blob(container_name, blob_name)
+                logger.error('deleted data from azure')
+                logger.error(f'Encountered error: {e}')
+                flash("An unexpected error occurred. Please try again.", "error")
+            return render_template('createpodcast.html', form=form,email_form=email_form)
 
-    return render_template('createpodcast.html', form=form)
+    return render_template('createpodcast.html', form=form,email_form=email_form)
 
 
 @views_bp.route('/create_episode', methods=['GET', 'POST'])
 @login_required
 def create_episode():
     form = EpisodeForm()
-
+    email_form = EmailForm()
     # Fetch the list of podcasts that belong to the current user
     podcasts = Podcast.query.filter_by(user_id=current_user.id).all()
 
     # Populate the podcast dropdown with podcast titles and IDs
     form.podcast_id.choices = [(podcast.id, podcast.title) for podcast in podcasts]
 
+    # form validation
     if form.validate_on_submit():
 
         logging.info("Form is valid, processing data")
         title = form.title.data
         description = form.description.data
         podcast_id = form.podcast_id.data
-        publish_date = datetime.utcnow()
+        publish_date = datetime.now()
 
         # Process the image file upload (if any)
         if form.image_file.data:
@@ -190,34 +211,37 @@ def create_episode():
 
             if os.path.exists(file_path):
                 os.remove(file_path)
-        # Create a new episode record
-        new_episode = Episode(
-            title=title,
-            description=description,
-            image_url=image_url if image_url else None,
-            audio_url=audio_url,
-            podcast_id=podcast_id,
-            publish_date=publish_date
-        )
+
 
         try:
+            # Create a new episode record
+            new_episode = Episode(
+                title=title,
+                description=description,
+                image_url=image_url if image_url else None,
+                audio_url=audio_url,
+                podcast_id=podcast_id,
+                publish_date=publish_date
+            )
+
             db.session.add(new_episode)
             db.session.commit()
             logging.info("Episode created successfully!")
             flash('Episode created successfully!', 'success')
-            return redirect(url_for('views.episode_list'))
+            return redirect(url_for('views.episode',podcast_id=podcast_id))
         except Exception as e:
             db.session.rollback()
-            azure_storage_instance.delete_blob(container_name,blob_name)
+            azure_storage_instance.delete_blob(container_name, blob_name)
             logging.error(f"Error saving episode: {e}")
             flash(f"Error saving episode: {e}", "error")
-            return render_template('createepisodes.html', form=form, podcasts=podcasts)
+            return render_template('createepisodes.html', form=form, podcasts=podcasts,email_form=email_form)
 
-    return render_template('createepisodes.html', form=form, podcasts=podcasts)
+    return render_template('createepisodes.html', form=form, podcasts=podcasts,email_form=email_form)
 
 
 @views_bp.route('/about')
 def about():
+    email_form = EmailForm()
     about_shortcast_message = "At ShortCast, we’re redefining the podcast experience with a focus on short-form, " \
                               "impactful content tailored for your busy lifestyle. Whether you’re commuting, " \
                               "taking a quick break, or simply looking to absorb valuable insights in bite-sized " \
@@ -228,19 +252,21 @@ def about():
                               "community of podcast enthusiasts and discover fresh, engaging content right at your " \
                               "fingertips. With ShortCast, every second is an opportunity to learn, laugh, " \
                               "and connect. "
-    return render_template('about.html', about_shortcast_message=about_shortcast_message)
+    return render_template('about.html', about_shortcast_message=about_shortcast_message,email_form=email_form)
 
 
 @views_bp.route('/contact')
 def contact():
-    return render_template('contact.html')
+    email_form = EmailForm()
+    return render_template('contact.html',email_form=email_form)
 
 
 @views_bp.route('/login')
 def login():
+    email_form = EmailForm()
     auth_link = get_authentication_links()
 
-    return render_template("login-register.html", auth_links=auth_link)
+    return render_template("login-register.html", auth_links=auth_link,email_form=email_form)
 
 
 @views_bp.route('/callback')
@@ -297,6 +323,7 @@ def callback_route():
 @login_required
 def podcast():
     try:
+        email_form = EmailForm()
         page = request.args.get('page', 1, type=int)
         per_page = 10
 
@@ -331,7 +358,7 @@ def podcast():
         category_names = [category.name for category in Categories]
 
         return render_template('podcastlist.html', pagination=pagination, podcasts=podcasts, playlists=playlists,
-                               categories=category_names)
+                               categories=category_names,email_form=email_form)
 
     except Exception as e:
         logger.error(f'Failed to retrieve paginated podcasts: {str(e)}')
@@ -342,6 +369,7 @@ def podcast():
 @login_required
 def episode():
     try:
+        email_form = EmailForm()
         page = request.args.get('page', 1, type=int)
         per_page = 10
 
@@ -384,7 +412,8 @@ def episode():
             pagination=pagination,
             episodes=episodes,
             playlists=playlists,
-            podcast_id=podcast_id
+            podcast_id=podcast_id,
+            email_form=email_form
         )
 
     except Exception as e:
@@ -393,7 +422,7 @@ def episode():
 
     except Exception as e:
         logger.error(f'Failed to retrieve paginated episodes: {str(e)}')
-        return render_template('episodeslist.html', pagination=None, episodes=[], playlists=playlists)
+        return render_template('episodeslist.html', pagination=None, episodes=[], playlists=playlists,email_form=email_form)
 
 
 @views_bp.route('/live-podcasts')
@@ -406,6 +435,7 @@ def live_podcast():
 @login_required
 def create_playlist():
     form = PlaylistForm()  # Initialize the form
+    email_form = EmailForm()
     if form.validate_on_submit():
         # Handle form submission
         playlist_title = form.title.data  # Get the playlist title from form
@@ -441,7 +471,8 @@ def create_playlist():
                 'createplaylist.html',
                 form=form,
                 title=playlist_title,
-                image_url=image_url
+                image_url=image_url,
+                email_form=email_form
             )
 
         except SQLAlchemyError as db_err:
@@ -459,7 +490,7 @@ def create_playlist():
                 os.remove(file_path)
 
     # For GET request or if validation fails
-    return render_template('createplaylist.html', form=form)
+    return render_template('createplaylist.html', form=form,email_form=email_form)
 
 
 @views_bp.route('/removeplaylist/<int:playlist_id>', methods=['POST'])
@@ -506,9 +537,11 @@ def remove_playlist(playlist_id):
 @login_required
 def user_playlists():
     # Fetch all playlists belonging to the current user
+    email_form = EmailForm()
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
 
-    return render_template('viewplaylist.html', playlists=playlists)
+
+    return render_template('viewplaylist.html', playlists=playlists,email_form=email_form)
 
 
 @views_bp.get('/open_playlist/<int:playlist_id>')
@@ -681,6 +714,56 @@ def delete_playlist(playlist_id):
     return redirect(url_for('views.podcasts'))  # Redirect to the list of podcasts or playlists
 
 
+@views_bp.route('/email', methods=['POST'])
+def email_route():
+    referrer = request.referrer
+    form = EmailForm(request.form)
+    if form.validate_on_submit():
+        logger.info('Form is valid, processing data')
+        email = form.email.data
+        # Send email task
+        task = send_verification_email.delay(email, token='d')
+        flash('Sent Subscription Message to your Inbox', 'success')
+        return redirect(referrer)  # Redirect to the current URL
+    else:
+        flash('Invalid form data. Please try again.', 'danger')
+        return redirect(referrer)
+
+
+@views_bp.route('/task_status/<task_id>', methods=['GET'])
+def task_status(task_id):
+    """
+    Route to check the status of a Celery task.
+    """
+    task = AsyncResult(task_id)
+
+    if task.state == 'PENDING':
+        response = {
+            'task_id': task_id,
+            'status': task.state,
+            'message': 'The task is still processing.'
+        }
+    elif task.state == 'SUCCESS':
+        response = {
+            'task_id': task_id,
+            'status': task.state,
+            'result': task.result
+        }
+    elif task.state == 'FAILURE':
+        response = {
+            'task_id': task_id,
+            'status': task.state,
+            'error': str(task.info)
+        }
+    else:
+        response = {
+            'task_id': task_id,
+            'status': task.state
+        }
+
+    return jsonify(response)
+
+
 @views_bp.route('/logout')
 def logout():
     logger.info('User initiated logout.')
@@ -712,62 +795,5 @@ def logout():
     session.clear()
 
     return redirect(url_for('views.index'))
-#
-#
-# @views_bp.route('/login')
-# def login_route():
-#     oauth_obj_twitch = OauthFacade('twitch', response_type="code",
-#                                    scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-#                                           "user:read:follows"])
-#
-#     oauth_obj_github = OauthFacade('github', response_type="code",
-#                                    scope=["user:read:email", "user:read:broadcast", "moderator:read:followers",
-#                                           "user:read:follows"])
-#
-#     auth_instance_twitch = oauth_obj_twitch
-#     auth_instance_github = oauth_obj_github
-#     auth_instances: dict = {'github_link': auth_instance_github.get_auth_link(),
-#                             'twitch_link': auth_instance_twitch.get_auth_link()}
-#
-#     return render_template('login-register.html', auth_links=auth_instances)
-#
-#
-# @views_bp.route('/singlepost')
-# def single_post():
-#     return render_template('single-post.html')
-#
 
-
-# @views_bp.route('/podcasts')
-# def pocast():
-#     return render_template('podcastlist.html')
-#
-#
-# @views_bp.route('/episodes')
-# def episodes():
-#     return render_template('episodeslist.html')
-#
-#
-# @views_bp.route('/user')
-# def users():
-#     return render_template('profile.html')
-#
-# @views_bp.route('/createpodcast')
-# def create_podcast():
-#     return render_template('createpodcast.html')
-#
-#
-# @views_bp.route('/createepisode')
-# def create_episode():
-#     return render_template('createepisodes.html')
-#
-#
-# @views_bp.route('/uploads')
-# def upload():
-#     return render_template('user_uploads.html')
-#
-
-#
-# @views_bp.route('/playlist')
-# def view_playlist():
-#     return render_template('viewplaylist.html')
+#TODO : find a way to properly arrange the api

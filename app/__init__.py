@@ -2,15 +2,26 @@ import os
 import logging
 from datetime import timedelta
 from flask import Flask, jsonify, render_template
+from celery import Celery
 from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flasgger import Swagger
-from celery_utils import make_celery
 from app.models import db, User
 from app.model_utils import *
-from celery.result import AsyncResult
+
+
+def make_celery(app):
+    celery = Celery(
+        app.import_name,
+        backend=app.config['CELERY_RESULT_BACKEND'],
+        broker=app.config['CELERY_BROKER_URL']
+    )
+
+    celery.autodiscover_tasks(['app.emailservice'])
+    celery.conf.update(app.config)
+    return celery
 
 
 def create_app():
@@ -21,9 +32,9 @@ def create_app():
     logger = logging.getLogger(__name__)
 
     # Flask Configuration
-    app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
-    app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
-    app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'supersecretkey')
+    app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL')
+    app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND')
+    app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', os.getenv('FLASK_SECRET_KEY'))
     app.config['WTF_CSRF_ENABLED'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI_SHORTCAST', 'sqlite:///default.db')
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
@@ -35,6 +46,7 @@ def create_app():
     CSRFProtect(app)
     Swagger(app)
     celery = make_celery(app)
+    print(celery.tasks.keys())
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = 'views.login'
@@ -55,7 +67,7 @@ def create_app():
         return render_template('404.html'), 404
 
     # Import and Register Blueprints
-    from app.views.view import views_bp
+    # from app.views.view import views_bp
     from app.api.auth.auth import auth
     from app.api.oauth.api import oauth
     from app.api.download.download import download
@@ -71,7 +83,6 @@ def create_app():
     from app.api.azureops.azureapi import azure_api
     from app.api.users.users import users
 
-    app.register_blueprint(views_bp)
     app.register_blueprint(auth)
     app.register_blueprint(oauth)
     app.register_blueprint(azure_api)
@@ -91,20 +102,5 @@ def create_app():
     @app.route('/milo2')
     def med():
         return render_template('index.html')
-
-    # Celery Task
-    @celery.task
-    def add_numbers(a, b):
-        return a + b
-
-    @app.route('/add/<int:a>/<int:b>')
-    def add(a, b):
-        task = add_numbers.delay(a, b)
-        return jsonify({"task_id": task.id, "status": "Task submitted"})
-
-    @app.route('/status/<task_id>')
-    def task_status(task_id):
-        task_result = AsyncResult(task_id, app=celery)
-        return jsonify({"task_id": task_id, "status": task_result.status, "result": task_result.result})
 
     return app, celery

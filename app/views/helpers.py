@@ -1,9 +1,10 @@
+from wtforms.fields.choices import SelectMultipleField, RadioField
+
 from app.api.oauth.oauth import OauthFacade
 from flask_wtf import FlaskForm
-from wtforms import StringField, FileField, TextAreaField, IntegerField, SelectField, HiddenField
+from wtforms import StringField, FileField, TextAreaField, IntegerField, SelectField, HiddenField,BooleanField
 from wtforms.validators import DataRequired, Optional, Length, URL
-from datetime import datetime, timedelta
-import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -38,18 +39,26 @@ class EpisodeForm(FlaskForm):
     podcast_id = SelectField('Select Podcast', coerce=int,
                              validators=[DataRequired()])  # Using SelectField for dropdown
     image_file = FileField('Upload Image File', validators=[Optional()])
-    audio_file = FileField('Upload Audio File', validators=[Optional()])
-    publish_date = StringField('Publish Date', default=datetime.utcnow().isoformat(), validators=[Optional()])
+    audio_file = FileField('Upload Audio File', validators=[DataRequired()])
+    publish_date = StringField('Publish Date', default=datetime.now().isoformat(), validators=[Optional()])
 
 
 class PodcastForm(FlaskForm):
     image_file = FileField('Upload Image File', validators=[Optional()])
     title = StringField('Title', validators=[DataRequired(), Length(min=1, max=100)])
     description = TextAreaField('Description', validators=[DataRequired(), Length(min=1, max=500)])
-    category = StringField('Select Category(ies)',validators=[DataRequired()])
-    duration = IntegerField('Duration (in seconds)',validators=[Optional()])
-    feed_url = HiddenField(validators=[DataRequired()])
+
+    category = RadioField(
+        'Select Categories',
+    )
+    duration = IntegerField('Duration (in seconds)', validators=[Optional()])
+
 
 class AddToPlaylistForm(FlaskForm):
     episode_id = HiddenField('Episode ID', validators=[DataRequired()])
     playlist_id = HiddenField('Playlist ID', validators=[DataRequired()])
+
+
+class EmailForm(FlaskForm):
+
+    email = StringField('Email', validators=[DataRequired(), Length(min=1, max=500)])

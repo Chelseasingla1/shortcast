@@ -22,36 +22,37 @@
           <div class="col-md-12">
 
 
-<form action="{{ url_for("views.create_episode") }}" method="post" class="bg-white p-5 shadow-sm rounded-lg" enctype="multipart/form-data">
+<form action="{{ url_for('views.create_episode') }}" method="post" class="bg-white p-5 shadow-sm rounded-lg" enctype="multipart/form-data">
   <!-- CSRF Token -->
-  {{ form.hidden_tag() }}
+  {{ form.csrf_token() }}
 
   <h3>Create Episode</h3>
   <p class="text-muted">Select the podcast to add an episode to, then fill in the episode details.</p>
 
   <!-- Podcast Selection Section -->
   <div class="form-group">
-    <label for="{{ form.podcast_id.id }}" class="text-black">Select Podcast <span class="text-danger">*</span></label>
+    <label  class="text-black">Select Podcast <span class="text-danger">*</span></label>
     {{ form.podcast_id(class="form-control") }}
   </div>
 
   <!-- Episode Title Section -->
   <div class="form-group">
-    <label for="{{ form.title.id }}" class="text-black">Episode Title <span class="text-danger">*</span></label>
+    <label class="text-black">Episode Title <span class="text-danger">*</span></label>
     {{ form.title(class="form-control", placeholder="Enter your episode title") }}
   </div>
 
   <!-- Episode Description Section -->
   <div class="form-group">
-    <label for="{{ form.description.id }}" class="text-black">Episode Description <span class="text-danger">*</span></label>
+    <label  class="text-black">Episode Description <span class="text-danger">*</span></label>
     {{ form.description(class="form-control", rows="4", placeholder="Describe your episode content.") }}
   </div>
 
       <!-- Episode Image File Section -->
   <div class="form-group">
-    <label for="{{ form.image_file.id }}" class="text-black">Episode Audio File <span class="text-danger">*</span></label>
+    <label class="text-black">Episode Image</label>
+    <img src="https://img.icons8.com/fluency/96/image--v1.png" alt="" id="c_episode_image" class="rounded-circle" width="80" height="80">
     <div class="custom-file">
-      {{ form.image_file(class="custom-file-input", accept="image/*") }}
+      {{ form.image_file(class="custom-file-input", accept="image/*",id='c_episode_file') }}
       <label class="custom-file-label" for="{{ form.image_file.id }}">Choose image file</label>
     </div>
   </div>
@@ -59,15 +60,21 @@
   <!-- Episode Audio File Section -->
   <div class="form-group">
     <label for="{{ form.audio_file.id }}" class="text-black">Episode Audio File <span class="text-danger">*</span></label>
+    <img src="https://img.icons8.com/fluency/96/image--v1.png" alt="" id="c_episode_audio" class="rounded-circle" width="80" height="80">
     <div class="custom-file">
-      {{ form.audio_file(class="custom-file-input", accept="audio/*") }}
+      {{ form.audio_file(class="custom-file-input", accept="audio/*",id="c_episode_audio_file") }}
       <label class="custom-file-label" for="{{ form.audio_file.id }}">Choose audio file</label>
     </div>
   </div>
 
+  <div class="form-group ">
+        <label class="text-black">Duration</label>
+      {{form.duration(class="form-control", id="podcast_duration", placeholder='Duration in Seconds',rows='4')}}
+    </div>
+
   <!-- Submit Button -->
   <div class="form-group">
-    <input type="submit" class="btn btn-primary btn-lg" value="Create Episode">
+    <button type="submit" class="btn btn-primary btn-lg" >Create Episode</button>
   </div>
 </form>
 
@@ -98,3 +105,45 @@
   </div>
 
 {% endblock %}
+
+{%block otherscripts%}
+<script>
+ function handleFileChange(inputId, outputId, isAudio = false) {
+    document.getElementById(inputId).addEventListener('change', function (e) {
+        const file = e.target.files[0];
+
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                console.log(reader.result);
+                const outputElement = document.getElementById(outputId);
+                if (isAudio) {
+                    outputElement.src = 'https://img.icons8.com/ios/50/000000/audio-wave.png';
+                } else {
+                    outputElement.src = reader.result;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// Call the function for the image input
+handleFileChange('c_episode_file', 'c_episode_image');
+
+// Call the function for the audio input
+handleFileChange('c_episode_audio_file', 'c_episode_audio', true);
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+    const inputs = document.querySelectorAll('.custom-file-input');
+    inputs.forEach(input => {
+        input.addEventListener('change', (event) => {
+            const fileName = event.target.files[0]?.name || "Choose file";
+            const label = event.target.nextElementSibling;
+            label.textContent = fileName;
+        });
+    });
+});
+</script>
+{%endblock%}

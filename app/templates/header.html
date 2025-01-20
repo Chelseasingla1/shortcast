@@ -15,7 +15,7 @@
 
 
           <div class="col-3">
-            <h1 class="site-logo"><a href="{{ url_for("views.index") }}" class="h2">Shortcast<span class="text-primary">.</span> </a></h1>
+            <h1 class="site-logo"><a href="{{ url_for('views.index') }}" class="h2">Shortcast<span class="text-primary">.</span> </a></h1>
           </div>
           <div class="col-9">
             <nav class="site-navigation position-relative text-right text-md-right" role="navigation">
@@ -26,7 +26,7 @@
 
               <ul class="site-menu js-clone-nav d-none d-lg-block">
                 <li class="{% if request.endpoint == 'views.index' %}active{% endif %}">
-                  <a href="{{ url_for("views.index") }}">Home</a>
+                  <a href="{{ url_for('views.index') }}">Home</a>
                 </li>
 
              <li class="has-children {% if request.endpoint in ['views.create_podcast', 'views.create_episode'] %}active{% endif %}">
@@ -46,17 +46,7 @@
 
 
 
-               <li class="has-children {% if request.endpoint in ['views.about', 'views.contact'] %}active{% endif %}">
-                <a href="#">Info</a>
-                 <ul class="dropdown arrow-top">
-                    <li class="{% if request.endpoint == 'views.about' %}active{% endif %}">
-                        <a href="{{ url_for('views.about') }}">About</a>
-                    </li>
-                     <li class="{% if request.endpoint == 'views.contact' %}active{% endif %}">
-                        <a href="{{ url_for('views.contact') }}">Contact</a>
-                    </li>
-                </ul>
-            </li>
+
 
 
                <li class="has-children {% if request.endpoint in ['views.podcast', 'views.live_podcast'] %}active{% endif %}">
@@ -70,18 +60,30 @@
                     </li>
                 </ul>
             </li>
-
-
+                    <li class="has-children {% if request.endpoint in ['views.about', 'views.contact'] %}active{% endif %}">
+                <a href="#">Info</a>
+                 <ul class="dropdown arrow-top">
+                    <li class="{% if request.endpoint == 'views.about' %}active{% endif %}">
+                        <a href="{{ url_for('views.about') }}">About</a>
+                    </li>
+                     <li class="{% if request.endpoint == 'views.contact' %}active{% endif %}">
+                        <a href="{{ url_for('views.contact') }}">Contact</a>
+                    </li>
+                </ul>
+            </li>
                   {% if current_user.is_authenticated %}
-                        <li><a href="{{ url_for("views.create_playlist") }}">Create playlist</a></li>
-                       <img src="{{ current_user.profile_image_url|safe }}" alt="User Avatar" class="rounded-circle" width="60" height="60">
+                        <li><a href="{{ url_for('views.create_playlist') }}">Create playlist</a></li>
+                        <img src="{{ current_user.profile_image_url|safe }}" alt="User Avatar" class="rounded-circle" width="60" height="60">
+                       <li class="{% if request.endpoint == 'views.logout' %}active{% endif %}">
+                        <a href="{{ url_for('views.logout') }}">Logout</a>
+                        </li>
                   {% else %}
-                <li class="{% if request.endpoint == 'views.login' %}active{% endif %}"><a href="{{ url_for("views.login") }}">Login / Register</a></li>
+                <li class="{% if request.endpoint == 'views.login' %}active{% endif %}"><a href="{{ url_for('views.login') }}">Login / Register</a></li>
+
+
                   {% endif %}
 
-                <li class="{% if request.endpoint == 'views.logout' %}active{% endif %}">
-                    <a href="{{ url_for('views.logout') }}">Logout</a>
-                </li>
+
 
 
               </ul>

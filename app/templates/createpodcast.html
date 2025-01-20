@@ -1,25 +1,25 @@
-
 {% extends 'base.html' %}
 {% block content %}
   <div class="site-wrap">
-
-    <div class="site-section">
+    <div class="">
       <div class="container">
+
         <div class="row">
+
           <div class="col-md-7 mb-5">
-            <form action="{{ url_for("views.create_podcast") }}" method="post" class="bg-white">
-                 {{ form.hidden_tag() }}
-              <h3>Create Podcast</h3>
+              <h4 class="text-danger mb-3">Create a Podcast</h4>
+              <form action="{{url_for('views.create_podcast')}}" method="post" enctype="multipart/form-data">
+                 {{ form.csrf_token() }}
 
               <!-- Avatar Section -->
               <div class="form-group row">
                 <div class="col-md-12">
-                  <label for="c_avatar" class="text-black">Podcast Avatar</label>
+
                   <div class="d-flex align-items-center">
-                    <img src="https://via.placeholder.com/150" alt="Podcast Avatar" class="rounded-circle" width="130" height="130">
+                    <img src="https://img.icons8.com/fluency/96/image--v1.png" alt="" id="c_avater_image" class="rounded-circle" width="130" height="130">
                     <div class="custom-file ml-3">
-                      <input type="file" class="custom-file-input" id="c_avatar" name="c_avatar" accept="image/*">
-                      <label class="custom-file-label" for="c_avatar">Choose file</label>
+                      {{form.image_file(class="custom-file-input", id="c_avatar", required=True, accept="image/*")}}
+                        <label class="custom-file-label">Choose file</label>
                     </div>
                   </div>
                 </div>
@@ -28,26 +28,91 @@
               <!-- Podcast Title and Description -->
               <div class="form-group row">
                 <div class="col-md-12">
-                  <label for="podcast_title" class="text-black">Podcast Title <span class="text-danger">*</span></label>
-                  <input type="text" class="form-control" id="podcast_title" name="podcast_title" placeholder="Enter Podcast Title">
+                  <label class="text-black">Podcast Title <span class="text-danger">*</span></label>
+<!--                  <input type="text" class="form-control" id="podcast_title" name="podcast_title" placeholder="Enter Podcast Title">-->
+                {{form.title(class="form-control", id="podcast_title", required=True,placeholder='Enter Podcast Title')}}
                 </div>
               </div>
               <div class="form-group row">
                 <div class="col-md-12">
-                  <label for="podcast_description" class="text-black">Description <span class="text-danger">*</span></label>
-                  <textarea class="form-control" id="podcast_description" name="podcast_description" rows="4" placeholder="Enter Podcast Description"></textarea>
+                  <label  class="text-black">Description <span class="text-danger">*</span></label>
+<!--                  <textarea class="form-control" id="podcast_description" name="podcast_description" rows="4" placeholder="Enter Podcast Description"></textarea>-->
+                {{form.description(class="form-control", id="podcast_description", required=True,placeholder='Enter Podcast Description',rows="4")}}
                 </div>
               </div>
 
+
+     <div class="form-group row">
+      <div class="col-md-12">
+    <label for="categoryCollapse" class="text-black">Podcast Category <span class="text-danger">*</span></label>
+    <button type="button" class="btn btn-link" data-toggle="collapse" data-target="#categoryCollapse" aria-expanded="false" aria-controls="categoryCollapse">
+      Toggle Categories
+    </button>
+
+    <div id="categoryCollapse" class="collapse">
+
+         {% for subfield in form.category %}
+            <div class="form-check">
+                {{ subfield(class="form-check-input") }}
+                <label class="form-check-label" for="{{subfield.id}}">{{ subfield.label.text }}</label>
+            </div>
+        {% endfor %}
+
+    </div>
+
+  </div>
+</div>
+
               <div class="form-group row">
                 <div class="col-md-12">
-                  <input type="submit" class="btn btn-primary btn-lg" value="Create Podcast">
+                  <label class="text-black">Duration</label>
+<!--                  <input type="number" class="form-control" id="podcast_duration" name="podcast_duration" rows="4" placeholder="Duration in Seconds">-->
+                {{form.duration(class="form-control", id="podcast_duration", placeholder='Duration in Seconds',rows='4')}}
+                </div>
+              </div>
+
+
+              <div class="form-group row">
+                <div class="col-md-12">
+                    <button type="submit" class="btn btn-primary btn-lg">Create Podcast</button>
                 </div>
               </div>
             </form>
           </div>
+
         </div>
+
       </div>
     </div>
   </div>
 {% endblock %}
+
+{% block otherscripts %}
+  <script>
+    document.getElementById('c_avatar').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+
+      if(file){
+        const reader = new FileReader();
+        reader.onload = function () {
+        console.log(reader.result);
+          document.getElementById('c_avater_image').src = reader.result;
+        }
+        reader.readAsDataURL(file);
+      }
+
+    });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const input = document.querySelector('.custom-file-input');
+        input.addEventListener('change', (event) => {
+            const fileName = event.target.files[0]?.name || "Choose file";
+            const label = event.target.nextElementSibling;
+            label.textContent = fileName;
+        });
+    });
+
+</script>
+{% endblock %}
+
+<!--add default avater images-->

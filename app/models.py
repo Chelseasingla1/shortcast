@@ -1,6 +1,6 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import String, Enum, Integer, DateTime, ForeignKey, SmallInteger
+from sqlalchemy import String, Enum, Integer, DateTime, ForeignKey, SmallInteger, UniqueConstraint
 from sqlalchemy.sql import func
 from app.model_utils import Providers, Roles, Categories, Shared
 from flask_login import UserMixin
@@ -63,8 +63,15 @@ class Podcast(db.Model):
     downloads: Mapped[list['Download']] = db.relationship('Download', backref='podcast', cascade='all, delete-orphan')
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('user.id', name='fk_user_podcast'), nullable=False)
 
+    __table_args__ = (
+        UniqueConstraint('publisher', 'title', name='uix_publisher_title'),
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+    def validate_urls(self):
+        """Validates the feed_url and audio_url."""
         if not (self.feed_url or self.audio_url):
             raise ValueError("Either 'feed_url' or 'audio_url' must be provided.")
         if self.feed_url and self.audio_url:
