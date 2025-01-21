@@ -34,17 +34,9 @@
     <div class="alert alert-info text-center mt-4">
         You have no playlists yet. Start by creating one!
     </div>
-        <div class="text-center mt-4">
-              <a href="{{ url_for("views.create_playlist") }}" class="btn btn-primary">Create New Playlist</a>
+        <div class="text-center mt-4 mb-5">
+              <a href="{{ url_for('views.create_playlist') }}" class="btn btn-primary">Create New Playlist</a>
             </div>
     {% endif %}
 </div>
-{% endblock %}
-
-
-{% block otherscripts %}
-
-
-
-
 {% endblock %}

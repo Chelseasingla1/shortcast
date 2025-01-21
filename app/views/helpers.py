@@ -62,3 +62,8 @@ class AddToPlaylistForm(FlaskForm):
 class EmailForm(FlaskForm):
 
     email = StringField('Email', validators=[DataRequired(), Length(min=1, max=500)])
+
+class PreferencesForm(FlaskForm):
+    avatar = FileField('Upload Avatar',validators=[Optional()])
+    username = StringField('Username',validators=[Optional()])
+    email = StringField('Email', validators=[DataRequired(), Length(min=1, max=500)])

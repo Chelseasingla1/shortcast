@@ -7,18 +7,20 @@ from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 from datetime import datetime
-
+from difflib import SequenceMatcher
 from celery.result import AsyncResult
 
 from app.api.auth import login_user_
 from app.api.azureops.azureapi import azure_storage_instance
 from app.api.oauth.oauth import OauthFacade
+from app.api.users.users import update_user
 from app.model_utils import Categories
 from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm, PodcastForm, \
-    EmailForm
+    EmailForm, PreferencesForm
 from flask_login import current_user, logout_user
 from flask_login import login_required
-from app.models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem
+from app.models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem, User, \
+    Favourite
 from app.api.azureops.azureclass import AzureBlobStorage
 from app.views.dbfuncs import add_episode_to_playlist
 from app.views.emailservice import send_verification_email
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 views_bp = Blueprint('views', __name__, static_folder='static', template_folder='templates')
 
-
+# home page route
 @views_bp.route('/', methods=['GET'])
 def index():
     nav_links = [
@@ -154,6 +156,7 @@ def create_podcast():
 @views_bp.route('/create_episode', methods=['GET', 'POST'])
 @login_required
 def create_episode():
+
     form = EpisodeForm()
     email_form = EmailForm()
     # Fetch the list of podcasts that belong to the current user
@@ -161,7 +164,8 @@ def create_episode():
 
     # Populate the podcast dropdown with podcast titles and IDs
     form.podcast_id.choices = [(podcast.id, podcast.title) for podcast in podcasts]
-
+    image_url = None
+    audio_url = None
     # form validation
     if form.validate_on_submit():
 
@@ -268,7 +272,7 @@ def login():
 
     return render_template("login-register.html", auth_links=auth_link,email_form=email_form)
 
-
+# route that handles oauth logic
 @views_bp.route('/callback')
 def callback_route():
     code = request.args.get('code')
@@ -318,7 +322,7 @@ def callback_route():
     flash('Invalid or missing code parameter.', 'error')
     return redirect(url_for('views.login'))
 
-
+# route to view all the published podcasts
 @views_bp.route('/podcasts')
 @login_required
 def podcast():
@@ -365,6 +369,7 @@ def podcast():
         return render_template('podcastlist.html', pagination=None, podcasts=[], playlists=playlists)
 
 
+# route to view all the published episodes in a podcast
 @views_bp.route('/episodes')
 @login_required
 def episode():
@@ -406,6 +411,9 @@ def episode():
         episodes = pagination.items
 
         playlists = Playlist.query.filter_by(user_id=current_user.id).all()
+        favourite_counts = {i.id: len(i.favourites) for i in episodes}
+        favourite_state = {i.id: True if any(fav.user_id == current_user.id for fav in i.favourites) else False for i in
+                           episodes}
 
         return render_template(
             'episodeslist.html',
@@ -413,7 +421,10 @@ def episode():
             episodes=episodes,
             playlists=playlists,
             podcast_id=podcast_id,
+            favourite_counts=favourite_counts,
+            favourite_state=favourite_state,
             email_form=email_form
+
         )
 
     except Exception as e:
@@ -425,12 +436,14 @@ def episode():
         return render_template('episodeslist.html', pagination=None, episodes=[], playlists=playlists,email_form=email_form)
 
 
+# route to view live podcasts
 @views_bp.route('/live-podcasts')
 @login_required
 def live_podcast():
     return
 
 
+# route to create a playlist of current user
 @views_bp.route('/createplaylist', methods=['GET', 'POST'])
 @login_required
 def create_playlist():
@@ -492,7 +505,7 @@ def create_playlist():
     # For GET request or if validation fails
     return render_template('createplaylist.html', form=form,email_form=email_form)
 
-
+# route to remove a playlist of the current user
 @views_bp.route('/removeplaylist/<int:playlist_id>', methods=['POST'])
 @login_required
 def remove_playlist(playlist_id):
@@ -532,7 +545,7 @@ def remove_playlist(playlist_id):
 
     return redirect(url_for('views.user_playlists'))
 
-
+# route to get all playlist of the current user
 @views_bp.get('/playlists')
 @login_required
 def user_playlists():
@@ -546,14 +559,48 @@ def user_playlists():
 
 @views_bp.get('/open_playlist/<int:playlist_id>')
 def open_playlist(playlist_id):
-    playlist = Playlist.query.filter_by(id=playlist_id, user_id=current_user.id).first()
-    if not playlist:
-        flash('Playlist not found.', 'error')
-        return redirect(url_for('views_bp.user_playlists'))
+    try:
+        email_form=EmailForm()
+        title_search = request.args.get('title')
+        print('this is title serar',title_search)
 
-    return render_template('open_playlist.html', playlist=playlist)
+        playlist_items = []
+        playlist = Playlist.query.filter_by(id=playlist_id, user_id=current_user.id).first()
+        if playlist:
+            print(playlist.id)
+            playlist_playlist_item=PlaylistPlaylistitem.query.filter_by(playlist_id=playlist.id).all()
+            playlist_items_ids = [i.to_dict().get('playlist_item_id') for i in playlist_playlist_item]
+            for i in playlist_items_ids:
+                playlist_item = PlaylistItem.query.filter_by(id = i).first()
+                playlist_items.append(playlist_item)
+            if title_search:
+                print(title_search)
+                playlist_items = [a.episode for a in playlist_items if isinstance(a.episode.title, str) and SequenceMatcher(None, a.episode.title.upper(), title_search.upper()).ratio() > 0.5]
+            else:
+                playlist_items = [a.episode for a in playlist_items]
+            favourite_counts = {i.id:len(i.favourites) for i in playlist_items}
+            favourite_state = {i.id: True if any(fav.user_id == current_user.id for fav in i.favourites) else False for i in
+                           playlist_items}
+
+        if not playlist:
+            flash('Playlist not found.', 'error')
+            return redirect(url_for('views_bp.user_playlists'))
+
+        return render_template(
+            'open_playlist.html',
+            playlist_items=playlist_items,
+            playlist=playlist,
+            favourite_counts=favourite_counts,
+            favourite_state=favourite_state,
+            email_form=email_form
+
+        )
 
 
+    except Exception as e:
+        flash(f'An error occured')
+        return render_template('open_playlist.html', playlist_items=playlist_items,playlist=playlist,email_form=email_form)
+# route to add episode to playlist
 @views_bp.route('/add_to_playlist', methods=['POST'])
 @login_required
 def add_to_playlist():
@@ -623,8 +670,8 @@ def add_to_playlist():
         # Catch all other exceptions
         return jsonify({'msg': f'An unexpected error occurred: {str(e)}'}), 500
 
-
-@views_bp.route('/remove_from_playlist', methods=['POST'])
+# route to remove episode from playlist
+@views_bp.route('/remove_from_playlist', methods=['GET','DELETE'])
 @login_required
 def remove_from_playlist():
     try:
@@ -632,6 +679,7 @@ def remove_from_playlist():
         data = request.json
 
         if not data:
+            logger.error('no data provided')
             return jsonify({'msg': 'No data provided'}), 400
 
         episode_id = data.get('episode_id')
@@ -645,6 +693,7 @@ def remove_from_playlist():
         episode = Episode.query.get(episode_id)
 
         if not playlist or not episode:
+            logger.error('episode or playlist not found')
             return jsonify({'msg': 'playlist or episode not found'}), 404
 
         # Query the association table to check if the item exists
@@ -654,6 +703,7 @@ def remove_from_playlist():
         ).first()
 
         if not playlist_item_association:
+            logger.error('episode not found in playlist')
             return jsonify({'msg': 'Episode not found in the playlist'}), 404
 
         # Remove the playlist item from the playlist
@@ -665,7 +715,7 @@ def remove_from_playlist():
             db.session.delete(episode.playlist_items)
 
         db.session.commit()
-
+        logger.info('episode successfully removed')
         return jsonify({'msg': 'Episode removed from playlist successfully'}), 200
 
     except KeyError as e:
@@ -712,6 +762,86 @@ def delete_playlist(playlist_id):
     db.session.commit()
 
     return redirect(url_for('views.podcasts'))  # Redirect to the list of podcasts or playlists
+
+
+@views_bp.post('/favourite')
+@login_required
+def add_favourite():
+    data = request.json
+    episode_id = data.get('episode_id')
+
+    # Validate input
+    if not episode_id:
+        return jsonify({'status': 'error', 'message': 'Episode ID is required', 'data': None}), 400
+
+    try:
+        # Check if the episode is already in the user's favorites
+        existing_favourite = Favourite.query.filter_by(user_id=current_user.id, episode_id=episode_id).first()
+
+        if existing_favourite:
+            return jsonify({'status': 'error', 'message': 'Already in favourites', 'data': None}), 409
+
+        # Add to favourites
+        new_favourite = Favourite(user_id=current_user.id, episode_id=episode_id)
+        db.session.add(new_favourite)
+        db.session.commit()
+
+        return jsonify({'status': 'success', 'message': 'Added to favourites', 'data': None}), 201
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(str(e))
+        return jsonify({'status': 'error', 'message': 'Favourite action failed', 'error_code': 'SERVER ERROR',
+                        'data': None}), 500
+
+
+@views_bp.delete('/favourite')
+@login_required
+def remove_favourite():
+    data = request.json
+    episode_id = data.get('episode_id')
+
+    # Validate input
+    if not episode_id:
+        return jsonify({'status': 'error', 'message': 'Episode ID is required', 'data': None}), 400
+
+    try:
+        # Check if the episode is already in the user's favorites
+        existing_favourite = Favourite.query.filter_by(user_id=current_user.id, episode_id=episode_id).first()
+
+        if existing_favourite:
+            db.session.delete(existing_favourite)
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': 'removed from favourites', 'data': None}), 201
+        else:
+            return jsonify({'status': 'error', 'message': 'not found', 'data': None}), 404
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        logger.error(str(e))
+        return jsonify({'status': 'error', 'message': 'Favourite action failed', 'error_code': 'SERVER ERROR',
+                        'data': None}), 500
+
+
+@views_bp.get('/favourite')
+@login_required
+def get_episode_favourites():
+    # Get episode_id from query parameters
+    episode_id = request.args.get('episode_id')
+
+    # Validate input
+    if not episode_id:
+        return jsonify({'status': 'error', 'message': 'Episode ID is required', 'data': None}), 400
+
+    try:
+        # Count favourites for the episode
+        favourite_count = Favourite.query.filter_by(episode_id=episode_id).count()
+
+        return jsonify({'status': 'success', 'message': 'Retrieved number of likes', 'data': favourite_count}), 200
+    except SQLAlchemyError as e:
+        logger.error(str(e))
+        return jsonify({'status': 'error', 'message': 'Favourite action failed', 'error_code': 'SERVER ERROR',
+                        'data': None}), 500
+
+
 
 
 @views_bp.route('/email', methods=['POST'])
@@ -764,6 +894,57 @@ def task_status(task_id):
     return jsonify(response)
 
 
+
+@views_bp.route('/preferences',methods=['GET','PUT'])
+def preferences():
+    email_form = EmailForm()
+    form = PreferencesForm()
+    username= None
+    email = None
+
+    if form.validate_on_submit():
+        logging.info("Form is valid,processing data")
+        username = form.username.data
+        email = form.email.data
+        if form.avatar.data:
+            image_file = form.avatar.data
+            original_filename = secure_filename(image_file.filename)
+            unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+            file_path = os.path.join('/tmp', unique_filename)
+
+            image_file.save(file_path)  # Save the file temporarily
+
+            # Upload the image to Azure Blob Storage
+            blob_name = f"images/{unique_filename}"
+            try:
+                image_url = azure_storage_instance.upload_blob(container_name, blob_name, file_path)
+            except Exception as e:
+                flash(f"Error uploading image: {e}", "error")
+                return render_template('profile.html', form=form)
+
+            # Clean up the temporary file after upload
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        try:
+            update_user_details = User.query.filter_by(id=current_user.id).first()  # Get the first matching user
+            if update_user_details:  # Make sure the user exists
+                if username:
+                    update_user_details.username = username
+                if email:
+                    update_user_details.email = email
+                db.session.commit()
+                flash('updated preferences','success')
+                return redirect(url_for('views.preferences'))
+        except SQLAlchemyError as e:
+            logger.error(e)
+            db.session.rollback()
+            azure_storage_instance.delete_blob(container_name, blob_name)
+            return render_template('profile.html',email_form=email_form,form = form)
+
+    return render_template('profile.html',email_form=email_form,form = form)
+
+# route to log out
 @views_bp.route('/logout')
 def logout():
     logger.info('User initiated logout.')

@@ -83,11 +83,14 @@
           {% for podcast in podcasts %}
             <div class="col-md-4">
               <div class="d-block podcast-entry bg-white mb-5" data-aos="fade-up">
-                <div class="image w-100" style="height: 300px; background-image: url('/static/images/img_2.jpg');"></div>
+                <div class="image w-100" style="height: 300px; background-image: url('{{podcast.image_url}}');"></div>
                 <div class="text w-100">
-                  <h3 class="font-weight-light"><a href="single-post.html">{{ podcast.title }}</a></h3>
-                  <div class="text-white mb-3"><span class="text-black-opacity-05"><small>By {{ podcast.publisher }} <span class="sep">/</span> {{ podcast.publish_date }} <span class="sep">/</span> {{ podcast.duration }}</small></span></div>
-                  <p class="mb-4">{{ podcast.description }}</p>
+
+                  <div class="text-white mb-3"><span class="text-black-opacity-05 " style="font-size:1.2em"><a href="single-post.html">{{ podcast.title }}</a> </span></div>
+                  <div class="text-white mb-3"><span class="text-black-opacity-05"><small>Published by: {{ podcast.publisher }} </small></span></div>
+                  <div class="text-white mb-3"><span class="text-black-opacity-05"><small>Published date: {{ podcast.publish_date.date() }} </small></span></div>
+                  {{ '<div class="text-white mb-3"><span class="text-black-opacity-05"><small>Duration: ' + (podcast.duration / 60) | round(2) | string + 'm</small></span></div>' if podcast.duration else '' }}
+                   <div class="text-white mb-3"><span class="text-black-opacity-05"><small>Description: {{ podcast.description }} </small></span></div>
 
                   <!-- Subscription Button -->
                   <div class="share-icons mb-3">

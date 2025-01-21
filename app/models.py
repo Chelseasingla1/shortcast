@@ -113,12 +113,14 @@ class Episode(db.Model):
     def to_dict(self):
         return {
             'episode_id': self.id,
+            'podcast_id':self.podcast_id,
             'title': self.title,
             'description': self.description,
             'publish_date': self.publish_date.isoformat(),
             'image_url': self.image_url,
             'audio_url': self.audio_url,
             'duration': self.duration,
+
         }
 
 
@@ -142,9 +144,9 @@ class Favourite(db.Model):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('user.id', name='fk_user_favourite'), nullable=False,
                                          primary_key=True)
     podcast_id: Mapped[int] = mapped_column(Integer, ForeignKey('podcast.id', name='fk_podcast_favourite'),
-                                            primary_key=True, nullable=True)
+                                            nullable=True)
     episode_id: Mapped[int] = mapped_column(Integer, ForeignKey('episode.id', name='fk_episode_favourite'),
-                                            primary_key=True, nullable=True)
+                                            primary_key=True)
     added_date: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     # podcasts:Mapped[list['Podcast']] = db.relationship('Podcast',backref='favourite')
@@ -170,9 +172,9 @@ class Rating(db.Model):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('user.id', name='fk_user_rating'), nullable=False,
                                          primary_key=True)
     podcast_id: Mapped[int] = mapped_column(Integer, ForeignKey('podcast.id', name='fk_podcast_rating'),
-                                            primary_key=True, nullable=True)
+                                             nullable=True)
     episode_id: Mapped[int] = mapped_column(Integer, ForeignKey('episode.id', name='fk_episode_rating'),
-                                            primary_key=True, nullable=True)
+                                            primary_key=True)
     rating: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     review_text: Mapped[str] = mapped_column(String, nullable=True)
     review_date: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
@@ -205,9 +207,9 @@ class Download(db.Model):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('user.id', name='fk_user_download'), nullable=False,
                                          primary_key=True)
     podcast_id: Mapped[int] = mapped_column(Integer, ForeignKey('podcast.id', name='fk_podcast_download'),
-                                            primary_key=True, nullable=True)
+                                         nullable=True)
     episode_id: Mapped[int] = mapped_column(Integer, ForeignKey('episode.id', name='fk_episode_download'),
-                                            primary_key=True, nullable=True)
+                                            primary_key=True)
     download_date: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     # podcasts: Mapped[list['Podcast']] = db.relationship('Podcast', backref='download')

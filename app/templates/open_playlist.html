@@ -16,8 +16,8 @@
 
 
                  <!-- Search bar -->
-            <form method="GET" action="{{ url_for('views.episode') }}">
-                <input type="hidden" name="podcast_id" value="{{ podcast_id }}">
+            <form method="GET" action="{{ url_for('views.open_playlist', playlist_id=playlist.id) }}">
+
               <div class="input-group">
                 <div class="input-group-prepend">
                   <span class="input-group-text">Search</span>
@@ -25,40 +25,19 @@
                 <input type="text" class="form-control" name="title" value="{{ request.args.get('title', '') }}" placeholder="Search by Title">
               </div>
 
-           <div class="mt-3">
-                <button class="btn btn-secondary" type="button" data-toggle="collapse" data-target="#filterSection" aria-expanded="false" aria-controls="filterSection">
-                  Toggle Filters
-                </button>
-                <div class="collapse" id="filterSection">
-                  <div class="mt-3">
-                    <label for="min_duration">Min Duration (mins):</label>
-                    <input type="number" name="min_duration" id="min_duration" class="form-control" value="{{ request.args.get('min_duration', '') }}" placeholder="Min Duration">
-                  </div>
-                  <div class="mt-3">
-                    <label for="max_duration">Max Duration (mins):</label>
-                    <input type="number" name="max_duration" id="max_duration" class="form-control" value="{{ request.args.get('max_duration', '') }}" placeholder="Max Duration">
-                  </div>
-                  <div class="mt-3">
-                    <label for="start_date">Start Date:</label>
-                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ request.args.get('start_date', '') }}">
-                  </div>
-                  <div class="mt-3">
-                    <label for="end_date">End Date:</label>
-                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ request.args.get('end_date', '') }}">
-                  </div>
-                </div>
-              </div>
+
               <button type="submit" class="btn btn-primary mt-3 bg-dark"  >Apply Filters</button>
             </form>
 
 
 
 
-              <h2 class="font-weight-bold text-black mt-5">Episodes</h2>
+              <h2 class="font-weight-bold text-black mt-5">Episodes in {{playlist.title}}</h2>
             </div>
           </div>
           <div class="row">
-              {% for episode in episodes %}
+
+              {% for episode in playlist_items %}
 <div class="col-md-4">
     <div class="d-block podcast-entry bg-white mb-5" data-aos="fade-up">
         <div class="image w-100" style="height: 300px; background-image: url('{{episode.image_url if episode.image_url else episode.podcast.image_url}}');"></div>
@@ -77,12 +56,11 @@
             </p>
 
             <!-- Interactive Heart (Favorite) Icon -->
-            <div class="favorite-icon mb-3">
+       <div class="favorite-icon mb-3">
                 <i class="fas fa-heart" id="favorite-icon-{{ loop.index }}"  data-episode-id="{{ episode.id }}"  style="cursor:pointer;color: {{ 'rgb(231, 76, 60)' if favourite_state[episode.id] else '#bdc3c7' }};">
                     <span id="favourite-count-{{ episode.id }}"> {{ favourite_counts[episode.id] }}</span>
                 </i>
             </div>
-
 
 
                     <!-- Rating Section -->
@@ -99,13 +77,13 @@
 
 
 
-            <!-- Add to Playlist Button -->
-            <button class="btn btn-primary p-2" data-toggle="modal" data-target="#playlistModal{{ loop.index }}">
+            <!-- Delete Episode Playlist Button -->
+            <button class="btn btn-primary p-2 mb-3" onclick="removeFromPlaylist({{episode.id}},{{playlist.id}})" >
 
-                <i class="fas fa-list"></i>
+                <small>Remove from Playlist</small>
             </button>
-                 <div class="player mt-2" >
-                  <audio id="player2" preload="none" controls style="max-width: 100%" class="bg-dark">
+                 <div class="player">
+                  <audio id="player2" preload="none" controls style="max-width: 100%">
                     <source src="{{ episode.audio_url }}" type="audio/mp3">
                     </audio>
                   </div>
@@ -113,54 +91,8 @@
             <button  class="btn btn-dark mt-2 p-2" data-toggle="modal" data-target="#transcriptionModal{{ loop.index }}" >
                 transcribe
             </button>
-            <!-- Modal for Playlist Selection -->
 
-       <div class="modal fade" id="playlistModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="playlistModalLabel{{ loop.index }}" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" role="document">
-        <div class="modal-content shadow-lg border-0" >
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title" id="playlistModalLabel{{ loop.index }}">
-                    <i class="fas fa-list"></i> Choose Playlist
-                </h5>
-                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <ul class="list-group">
-                    {% for playlist in playlists %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span>
-                                <i class="fas fa-music text-primary mr-2"></i>
-                               {{ playlist.title }}
-                            </span>
-
-
-                            <button class="btn btn-sm btn-outline-primary" onclick="addToPlaylist({{ episode.id }}, {{ playlist.id }})" id="addToPlaylist">
-                                <i class="fas fa-plus"></i> Add{{ playlist.id }}
-                            </button>
-
-
-
-
-                        </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            <div class="modal-footer border-top-0">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                    <i class="fas fa-times"></i> Close
-                </button>
-            </div>
-
-
-
-
-        </div>
-    </div>
-</div>
-
-<!-- Modal for Transcription  -->
+                <!-- Modal for Transcription  -->
             <div class="modal fade" id="transcriptionModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="transcriptionModalLabel{{ loop.index }}" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered" role="document">
                     <div class="modal-content shadow-lg border-0" >
@@ -193,12 +125,19 @@
     </div>
 </div>
 
-
         </div>
     </div>
 </div>
 
                 {% endfor %}
+
+              {% if not playlist_items %}
+    <div class="alert alert-info text-center mt-4">
+        You have no episode in this playlist yet.
+    </div>
+    {% endif %}
+
+
               </div>
             </div>
           </div>
@@ -292,56 +231,6 @@ document.querySelectorAll('.rating-stars i').forEach(star => {
         // Example: send an AJAX request to save the user's rating to the server
     });
 });
-
-
-    function addToPlaylist(episode_id, playlist_id) {
-    // Get the CSRF token from the meta tag
-    const csrf_token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-    // Create the data to send in the request body as JSON
-    const data = {
-        episode_id: episode_id,
-        playlist_id: playlist_id
-    };
-
-    // Send the POST request with the data
-    fetch('/add_to_playlist', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json', // Indicate that we're sending JSON data
-            'X-CSRFToken': csrf_token // Include the CSRF token
-        },
-        body: JSON.stringify(data) // Send the data as a JSON string
-    })
-        .then(response => {
-            if (response.status === 200) {
-                alert('Episode already exists in the playlist!');
-                return { status: 200, data: response.json() };
-            } else if (response.status === 201) {
-                alert('Episode added to the playlist successfully!');
-                return { status: 201, data: response.json() };
-            } else if (response.status === 400) {
-                throw new Error('Bad request. Please check the data and try again.');
-            } else if (response.status === 404) {
-                throw new Error('Playlist or episode not found.');
-            } else if (response.status === 500) {
-                alert('There is a slight inconvenience, please try again later.');
-                throw new Error('Server error occurred.');
-            } else {
-                throw new Error(`Unexpected response: ${response.status}`);
-            }
-        })
-        .then(async (result) => {
-            const data = await result.data; // Wait for the JSON to parse
-            console.log(data); // Log the response data (if needed)
-        })
-        .catch(error => {
-            // Handle errors
-            console.error('Error:', error);
-            alert(`Error: ${error.message}`);
-        });
-}
-
 
 
        // Send post request to add the favourite
@@ -464,6 +353,53 @@ document.querySelectorAll('.rating-stars i').forEach(star => {
 
 
 
+
+ function removeFromPlaylist(episode_id, playlist_id) {
+    // Get the CSRF token from the meta tag
+    const csrf_token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    // Create the data to send in the request body as JSON
+    const data = {
+        episode_id: episode_id,
+        playlist_id: playlist_id
+    };
+    console.log(data);
+
+    // Send the POST request with the data
+    fetch('/remove_from_playlist', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json', // Indicate that we're sending JSON data
+            'X-CSRFToken': csrf_token // Include the CSRF token
+        },
+        body: JSON.stringify(data) // Send the data as a JSON string
+    })
+        .then(response => {
+            if (response.status === 200) {
+                alert('Episode removed successfully!');
+                location.reload();
+                return { status: 200, data: response.json() };
+            } else if (response.status === 400) {
+                throw new Error('Bad request. Please check the data and try again.');
+            } else if (response.status === 404) {
+                throw new Error('Playlist or episode not found.');
+            } else if (response.status === 500) {
+                alert('There is a slight inconvenience, please try again later.');
+                throw new Error('Server error occurred.');
+            } else {
+                throw new Error(`Unexpected response: ${response.status}`);
+            }
+        })
+        .then(async (result) => {
+            const data = await result.data; // Wait for the JSON to parse
+            console.log(data); // Log the response data (if needed)
+        })
+        .catch(error => {
+            // Handle errors
+            console.error('Error:', error);
+            alert(`Error: ${error.message}`);
+        });
+}
 
 
 </script>

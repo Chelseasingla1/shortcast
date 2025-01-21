@@ -29,7 +29,7 @@
                   <a href="{{ url_for('views.index') }}">Home</a>
                 </li>
 
-             <li class="has-children {% if request.endpoint in ['views.create_podcast', 'views.create_episode'] %}active{% endif %}">
+             <li class="has-children {% if request.endpoint in ['views.create_podcast', 'views.create_episode','views.create_playlist'] %}active{% endif %}">
                 <a href="#">Create</a>
                  <ul class="dropdown arrow-top">
                     <li class="{% if request.endpoint == 'views.create_podcast' %}active{% endif %}">
@@ -38,6 +38,9 @@
                      <li class="{% if request.endpoint == 'views.create_episode' %}active{% endif %}">
                         <a href="{{ url_for('views.create_episode') }}">Episode</a>
                     </li>
+                      <li class="{%if request.endpoint=='views.create_playlist'%}active{%endif%}">
+                          <a href="{{ url_for('views.create_playlist') }}">Playlist</a>
+                      </li>
                 </ul>
             </li>
 
@@ -49,7 +52,7 @@
 
 
 
-               <li class="has-children {% if request.endpoint in ['views.podcast', 'views.live_podcast'] %}active{% endif %}">
+               <li class="has-children {% if request.endpoint in ['views.podcast', 'views.live_podcast','views.user_playlists'] %}active{% endif %}">
                 <a href="#">Browse</a>
                  <ul class="dropdown arrow-top">
                     <li class="{% if request.endpoint == 'views.podcast' %}active{% endif %}">
@@ -57,6 +60,10 @@
                     </li>
                      <li class="{% if request.endpoint == 'views.live_podcast' %}active{% endif %}">
                         <a href="{{ url_for('views.live_podcast') }}">Live Podcast</a>
+                    </li>
+
+                      <li class="{% if request.endpoint == 'views.user_playlists' %}active{% endif %}">
+                        <a href="{{ url_for('views.user_playlists') }}">My Playlist</a>
                     </li>
                 </ul>
             </li>
@@ -72,9 +79,11 @@
                 </ul>
             </li>
                   {% if current_user.is_authenticated %}
-                        <li><a href="{{ url_for('views.create_playlist') }}">Create playlist</a></li>
-                        <img src="{{ current_user.profile_image_url|safe }}" alt="User Avatar" class="rounded-circle" width="60" height="60">
-                       <li class="{% if request.endpoint == 'views.logout' %}active{% endif %}">
+
+                  <a href="{{url_for('views.preferences')}}">
+                      <img src="{{ current_user.profile_image_url|safe }}" alt="User Avatar" class="rounded-circle" width="60" height="60">
+                  </a>
+                      <li class="{% if request.endpoint == 'views.logout' %}active{% endif %}">
                         <a href="{{ url_for('views.logout') }}">Logout</a>
                         </li>
                   {% else %}
