@@ -4,6 +4,7 @@ import requests
 from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify
 import logging
 from dotenv import load_dotenv
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -52,20 +53,37 @@ def index():
         {'text': 'Contact', 'url': url_for('views.contact'), 'active': False},
         {'text': 'Login / Register', 'url': url_for('views.login'), 'active': False}
     ]
+    popular_episode = []
 
-    top_podcasts = []
     latest_episodes = []
     shared_playlists = []
     email_form = EmailForm()
     try:
-        top_podcasts = Podcast.query.limit(10).all()
-        filter_top_podcasts = sorted(top_podcasts, key=lambda top: len(top.subscriptions), reverse=True)
+
+        top_episodes = (
+            db.session.query(
+                Favourite.episode_id, func.count(Favourite.user_id).label('favourite_count')
+            )
+            .group_by(Favourite.episode_id)
+            .order_by(func.count(Favourite.user_id).desc())
+            .limit(5)  # Get the top 5
+            .all()
+        )
+
+        # Convert the result to a list of dictionaries
+        most_popular_episodes = []
+        for episode_id, count in top_episodes:
+            episode = Episode.query.filter_by(id=episode_id).first()
+            if episode:
+                episode_dict = episode.to_dict()
+                episode_dict.update({'count': count})
+                most_popular_episodes.append(episode_dict)
+
 
         latest_episodes = Episode.query.order_by(Episode.publish_date.desc()).limit(8).all()
         shared_playlists = SharedPlaylist.query.all()
 
         latest_episodes = [episode.to_dict() for episode in latest_episodes]
-        top_podcasts = [podcast.to_dict() for podcast in filter_top_podcasts]
 
         shared_playlists = [shared_playlist.to_dict() for shared_playlist in shared_playlists]
     except Exception as e:
@@ -75,7 +93,7 @@ def index():
         'index.html',
         logo_text="ShortCast",
         nav_links=nav_links,
-        top_podcast=top_podcasts,
+        top_episodes=most_popular_episodes,
         latest_episodes=latest_episodes,
         shared_playlist=shared_playlists,
         email_form=email_form
@@ -563,6 +581,7 @@ def open_playlist(playlist_id):
         email_form=EmailForm()
         title_search = request.args.get('title')
         print('this is title serar',title_search)
+
 
         playlist_items = []
         playlist = Playlist.query.filter_by(id=playlist_id, user_id=current_user.id).first()

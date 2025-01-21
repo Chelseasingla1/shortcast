@@ -1,9 +1,10 @@
-from wtforms.fields.choices import SelectMultipleField, RadioField
+from flask_wtf.file import FileAllowed, FileSize
+from wtforms.fields.choices import RadioField
 
 from app.api.oauth.oauth import OauthFacade
 from flask_wtf import FlaskForm
-from wtforms import StringField, FileField, TextAreaField, IntegerField, SelectField, HiddenField,BooleanField
-from wtforms.validators import DataRequired, Optional, Length, URL
+from wtforms import StringField, FileField, TextAreaField, IntegerField, SelectField, HiddenField
+from wtforms.validators import DataRequired, Optional, Length
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -34,12 +35,17 @@ class PlaylistForm(FlaskForm):
 
 class EpisodeForm(FlaskForm):
     title = StringField('Title', validators=[DataRequired(), Length(min=1, max=100)])
-    description = TextAreaField('Description', validators=[DataRequired(), Length(min=1, max=500)])
+    description = TextAreaField('Description', validators=[DataRequired(), Length(min=10, max=100)])
     duration = IntegerField('Duration (in seconds)', validators=[Optional()])
     podcast_id = SelectField('Select Podcast', coerce=int,
                              validators=[DataRequired()])  # Using SelectField for dropdown
     image_file = FileField('Upload Image File', validators=[Optional()])
-    audio_file = FileField('Upload Audio File', validators=[DataRequired()])
+    audio_file = FileField('Upload Audio File', validators=[DataRequired(),
+                                                            FileAllowed(['mp3', 'wav', 'ogg'], 'Audio files only!'),
+                                                            FileSize(min_size=1*1024*1024,
+                                                                     max_size=50 * 1024 * 1024,
+                                                                     message='File size must be under 10MB! or above 1MB!')
+                                                            ])
     publish_date = StringField('Publish Date', default=datetime.now().isoformat(), validators=[Optional()])
 
 
@@ -67,3 +73,8 @@ class PreferencesForm(FlaskForm):
     avatar = FileField('Upload Avatar',validators=[Optional()])
     username = StringField('Username',validators=[Optional()])
     email = StringField('Email', validators=[DataRequired(), Length(min=1, max=500)])
+
+
+#TODO : configure celery to run the transcription service and the email service
+#TODO : add pages and routes for creators to update their podcast and episodes
+#TODO : get images from freepik

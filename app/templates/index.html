@@ -24,43 +24,40 @@
         <div class="row">
           <div class="col-lg-3">
             <div class="featured-user  mb-5 mb-lg-0">
-              <h3 class="mb-4">Popular Podcasts</h3>
+              <h3 class="mb-4">popular episodes</h3>
               <ul class="list-unstyled">
 
-                  {% for i in top_podcast %}
+              {%for top_episode in top_episodes %}
                 <li>
-                  <a href="{{ url_for("views.create_podcast") }}" class="d-flex align-items-center">
-                    <img src="{{ i.image_url }}" alt="Image" class="img-fluid mr-2">
-                    <div class="podcaster">
-                      <span class="d-block">{{ i.title }}</span>
-                      <span class="small">{{ i.subscriptions }}</span>
-                    </div>
-                  </a>
+                 <a href="{{url_for('views.episode',podcast_id=top_episode.podcast_id,title=top_episode.title)}}" class="podcast-card d-flex align-items-center p-2 mb-2 text-decoration-none">
+    <img src="{{ top_episode.image_url }}" alt="Podcast Image" class="podcast-image rounded mr-3">
+    <div class="podcast-details d-flex flex-column">
+        <span class="podcast-title text-dark font-weight-bold">{{ top_episode.title }}</span>
+        <span class="podcast-description text-muted small">{{ top_episode.description }}</span>
+    </div>
+    <span class="podcast-count text-primary ml-auto small">{{ top_episode.count }}</span>
+</a>
+
                 </li>
-                  {% endfor %}
+                {% endfor %}
 
               </ul>
             </div>
           </div>
 
           <div class="col-lg-9">
-
+              <div class="featured-user  mb-5 mb-lg-0">
+      <h3 class="text-dark mb-4">Recently released episodes</h3>
 
               {% for i in latest_episodes %}
             <div class="d-block d-md-flex podcast-entry bg-white mb-5" data-aos="fade-up">
               <div class="image" style="background-image: url('{{ i.image_url }}');"></div>
               <div class="text">
 
-                <h3 class="font-weight-light"><a href="single-post.html">{{ i.title }}</a></h3>
-                <div class="text-white mb-3"><span class="text-black-opacity-05"><small>{{ i.description }} <span class="sep">/</span> {{ i.publish_date }} <span class="sep">/</span> 1:30:20</small></span></div>
+                <h3 class="font-weight-light text-info" style="cursor:pointer">{{ i.title }}</h3>
+                  <div class="text-white mb-3"><span class="text-black-opacity-05"><small>{{ i.description }} </small></span></div>
 
-
-                <div class="player">
-                  <audio id="player2" preload="none" controls style="max-width: 100%">
-                    <source src="{{ i.audio_url }}" type="audio/mp3">
-                    </audio>
-                  </div>
-
+                <a href="{{url_for('views.episode',podcast_id=i.podcast_id,title=i.title)}}" class="btn  mt-3 bg-dark">Listen</a>
                 </div>
               </div>
               {% endfor %}
@@ -70,13 +67,14 @@
 
                 </div>
               </div>
-
+      </div>
 
     <div class="site-section bg-light block-13">
       <div class="container">
         <div class="row mb-5">
           <div class="col-md-12 text-center">
             <h2 class="font-weight-bold text-black">Shared Playlists</h2>
+            <small>coming soon...</small>
           </div>
         </div>
         <div class="nonloop-block-13 owl-carousel">
