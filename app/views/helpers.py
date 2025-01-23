@@ -42,7 +42,7 @@ class EpisodeForm(FlaskForm):
     image_file = FileField('Upload Image File', validators=[Optional()])
     audio_file = FileField('Upload Audio File', validators=[DataRequired(),
                                                             FileAllowed(['mp3', 'wav', 'ogg'], 'Audio files only!'),
-                                                            FileSize(min_size=1*1024*1024,
+                                                            FileSize(
                                                                      max_size=50 * 1024 * 1024,
                                                                      message='File size must be under 10MB! or above 1MB!')
                                                             ])

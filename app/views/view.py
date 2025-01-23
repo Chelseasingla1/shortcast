@@ -174,7 +174,7 @@ def create_podcast():
 @views_bp.route('/create_episode', methods=['GET', 'POST'])
 @login_required
 def create_episode():
-
+    from tasks.transcriptionservice import transcribe
     form = EpisodeForm()
     email_form = EmailForm()
     # Fetch the list of podcasts that belong to the current user
@@ -231,8 +231,16 @@ def create_episode():
                 logging.error(f"Error uploading audio: {e}")
                 return render_template('createepisodes.html', form=form, podcasts=podcasts)
 
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            # transcription asynchronous
+            try:
+                task = transcribe.apply_async(args=[file_path,True])
+                task_id = task.id
+                task_info_singleton = TaskInfoSingleton()
+                task_info_singleton.set_task_info(task_id, 'transcription')
+                logger.info("Transcription started asynchronously.")
+            except Exception as e:
+                logger.error(f"Failed to start transcription: {e}")
+
 
 
         try:
@@ -963,6 +971,7 @@ def email_route():
     except Exception as e:
         logger.error(f"Error in sending email: {str(e)}")
         return jsonify({"error": "Failed to process the email request"}), 500
+
 
 
 @views_bp.route('/logout')
