@@ -102,6 +102,7 @@ class Episode(db.Model):
     publish_date: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     image_url: Mapped[str] = mapped_column(String, nullable=True)
     audio_url: Mapped[str] = mapped_column(String, nullable=False, unique=True, name='uq_episode_audio_url')
+    transcription:Mapped[str] = mapped_column(String,nullable=True)
     podcast_id: Mapped[int] = mapped_column(Integer, ForeignKey('podcast.id', name='fk_podcast_episode'),
                                             nullable=False)
     favourites: Mapped[list['Favourite']] = db.relationship('Favourite', backref='episode',

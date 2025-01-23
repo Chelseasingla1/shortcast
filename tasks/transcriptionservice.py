@@ -14,7 +14,7 @@ API_URL = "https://api-inference.huggingface.co/models/openai/whisper-small"
 headers = {"Authorization": f"Bearer {os.getenv('WHISPER_TOKEN')}"}
 
 @celery.task(bind=True, max_retries=3, default_retry_delay=60)
-def transcribe(self, filename,delete_after=True):
+def transcribe(self, filename,episode_id,delete_after=True):
     try:
         # Open the file and read the data
         with open(filename, "rb") as f:
@@ -28,7 +28,9 @@ def transcribe(self, filename,delete_after=True):
         # Check if the request was successful
         if response.status_code == 200:
             logger.info(f"API response successful for file: {filename}")
-            return response.json()
+            data = response.json()
+            data['episode_id'] = episode_id
+            return data
         else:
             logger.error(f"API request failed with status code: {response.status_code}. Retrying...")
             raise self.retry(exc=Exception(f"Failed API request. Status code: {response.status_code}"), countdown=60)
@@ -44,7 +46,7 @@ def transcribe(self, filename,delete_after=True):
         raise self.retry(exc=str(e), countdown=60)  # Retry after a delay
 
     finally:
-        if delete_after and not self.request.retries:  # Delete only after the last retry
+        if delete_after and (self.request.retries >= self.max_retries):
             if os.path.exists(filename):
                 os.remove(filename)
                 logger.info(f"File {filename} removed successfully.")

@@ -1,7 +1,7 @@
 import logging
 from celery.signals import task_success, task_failure, task_received, task_retry
 from task_singleton import TaskInfoSingleton
-
+from app.views.dbfuncs import update_transcription
 
 def handle_task_info(task_id):
     """
@@ -42,6 +42,7 @@ def task_received_handler(sender=None, task_id=None, **kwargs):
 
 @task_success.connect
 def task_success_handler(sender=None, result=None, task_id=None, **kwargs):
+    print(result)
     """
     Signal handler for task success events.
     """
@@ -54,6 +55,15 @@ def task_success_handler(sender=None, result=None, task_id=None, **kwargs):
 
     task_name = handle_task_info(task_id)
     if task_name:
+
+        if task_name=='transcription':
+            episode_id = result.get('episode_id')
+            transcription_text = result.get('text')
+            print(episode_id,transcription_text)
+            if transcription_text and episode_id:
+                update_transcription(int(episode_id),transcription_text)
+
+
         logging.info(f"Task {task_id} of type '{task_name}' succeeded.")
     else:
         logging.warning(f"Task {task_id} of unknown type succeeded.")

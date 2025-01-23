@@ -184,6 +184,7 @@ def create_episode():
     form.podcast_id.choices = [(podcast.id, podcast.title) for podcast in podcasts]
     image_url = None
     audio_url = None
+    audio_file_path = None
     # form validation
     if form.validate_on_submit():
 
@@ -218,28 +219,19 @@ def create_episode():
             audio_file = form.audio_file.data
             original_filename = secure_filename(audio_file.filename)
             unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-            file_path = os.path.join('/tmp', unique_filename)
+            audio_file_path = os.path.join('/tmp', unique_filename)
 
-            audio_file.save(file_path)
+            audio_file.save(audio_file_path)
 
             blob_name = f"audio/{unique_filename}"
             try:
-                audio_url = azure_storage_instance.upload_blob(container_name, blob_name, file_path)
+                audio_url = azure_storage_instance.upload_blob(container_name, blob_name, audio_file_path)
                 logging.info(f"Audio uploaded successfully: {audio_url}")
             except Exception as e:
                 flash(f"Error uploading audio: {e}", "error")
                 logging.error(f"Error uploading audio: {e}")
                 return render_template('createepisodes.html', form=form, podcasts=podcasts)
 
-            # transcription asynchronous
-            try:
-                task = transcribe.apply_async(args=[file_path,True])
-                task_id = task.id
-                task_info_singleton = TaskInfoSingleton()
-                task_info_singleton.set_task_info(task_id, 'transcription')
-                logger.info("Transcription started asynchronously.")
-            except Exception as e:
-                logger.error(f"Failed to start transcription: {e}")
 
 
 
@@ -258,6 +250,18 @@ def create_episode():
             db.session.commit()
             logging.info("Episode created successfully!")
             flash('Episode created successfully!', 'success')
+
+            # transcription asynchronous
+            try:
+                if audio_file_path and new_episode.id:
+                    task = transcribe.apply_async(args=[audio_file_path,new_episode.id,True])
+                    task_id = task.id
+                    task_info_singleton = TaskInfoSingleton()
+                    task_info_singleton.set_task_info(task_id, 'transcription')
+                    logger.info("Transcription started asynchronously.")
+            except Exception as e:
+                logger.error(f"Failed to start transcription: {e}")
+
             return redirect(url_for('views.episode',podcast_id=podcast_id))
         except Exception as e:
             db.session.rollback()
@@ -265,6 +269,8 @@ def create_episode():
             logging.error(f"Error saving episode: {e}")
             flash(f"Error saving episode: {e}", "error")
             return render_template('createepisodes.html', form=form, podcasts=podcasts,email_form=email_form)
+
+
 
     return render_template('createepisodes.html', form=form, podcasts=podcasts,email_form=email_form)
 
