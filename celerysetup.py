@@ -1,8 +1,13 @@
-from app import create_app
+from celery import Celery
+from flask import Flask
 
-app, celery = create_app()
-from app.views.emailservice.emailservice import send_verification_email
-if __name__ == '__main__':
-    celery.start()
+def make_celery(app: Flask):
+    celery = Celery(
+        app.import_name,
+        broker=app.config['CELERY_BROKER_URL'],
+        backend=app.config['CELERY_RESULT_BACKEND']
+    )
+    celery.conf.update(app.config)
 
-# celery -A celerysetup.celery worker --loglevel=info
+
+    return celery

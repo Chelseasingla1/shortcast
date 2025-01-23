@@ -1,7 +1,8 @@
 import os
 import uuid
 import requests
-from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify
+from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify,current_app
+from flask_login import current_user, logout_user,login_required
 import logging
 from dotenv import load_dotenv
 from sqlalchemy import func
@@ -9,7 +10,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.utils import secure_filename
 from datetime import datetime
 from difflib import SequenceMatcher
-from celery.result import AsyncResult
 
 from app.api.auth import login_user_
 from app.api.azureops.azureapi import azure_storage_instance
@@ -18,13 +18,13 @@ from app.api.users.users import update_user
 from app.model_utils import Categories
 from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm, PodcastForm, \
     EmailForm, PreferencesForm
-from flask_login import current_user, logout_user
-from flask_login import login_required
+
 from app.models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem, User, \
     Favourite
 from app.api.azureops.azureclass import AzureBlobStorage
 from app.views.dbfuncs import add_episode_to_playlist
-from app.views.emailservice import send_verification_email
+# from app.views.emailservice import send_verification_email
+from task_singleton import TaskInfoSingleton
 
 load_dotenv()
 
@@ -863,57 +863,6 @@ def get_episode_favourites():
 
 
 
-@views_bp.route('/email', methods=['POST'])
-def email_route():
-    referrer = request.referrer
-    form = EmailForm(request.form)
-    if form.validate_on_submit():
-        logger.info('Form is valid, processing data')
-        email = form.email.data
-        # Send email task
-        task = send_verification_email.delay(email, token='d')
-        flash('Sent Subscription Message to your Inbox', 'success')
-        return redirect(referrer)  # Redirect to the current URL
-    else:
-        flash('Invalid form data. Please try again.', 'danger')
-        return redirect(referrer)
-
-
-@views_bp.route('/task_status/<task_id>', methods=['GET'])
-def task_status(task_id):
-    """
-    Route to check the status of a Celery task.
-    """
-    task = AsyncResult(task_id)
-
-    if task.state == 'PENDING':
-        response = {
-            'task_id': task_id,
-            'status': task.state,
-            'message': 'The task is still processing.'
-        }
-    elif task.state == 'SUCCESS':
-        response = {
-            'task_id': task_id,
-            'status': task.state,
-            'result': task.result
-        }
-    elif task.state == 'FAILURE':
-        response = {
-            'task_id': task_id,
-            'status': task.state,
-            'error': str(task.info)
-        }
-    else:
-        response = {
-            'task_id': task_id,
-            'status': task.state
-        }
-
-    return jsonify(response)
-
-
-
 @views_bp.route('/preferences',methods=['GET','PUT'])
 def preferences():
     email_form = EmailForm()
@@ -963,7 +912,59 @@ def preferences():
 
     return render_template('profile.html',email_form=email_form,form = form)
 
-# route to log out
+@views_bp.route('/add/<int:a>/<int:b>')
+def add(a, b):
+    from tasks.testlongtask import add_numbers
+    task = add_numbers.apply_async(args=[a,b])
+    task_id = task.id
+
+    task_info_singleton = TaskInfoSingleton()
+    task_info_singleton.set_task_info(task_id,'add_numbers')
+    return jsonify({'task_id': task_id, 'message': 'Task submitted!'})
+
+@views_bp.route('/result/<task_id>')
+def result(task_id):
+
+    from tasks.testlongtask import add_numbers
+    task = add_numbers.AsyncResult(task_id)
+    if task.state == 'PENDING':
+        return "Task is still processing..."
+    elif task.state == 'SUCCESS':
+        return f"Task result: {task.result}"
+    else:
+        return f"Task failed or is in {task.state} state."
+
+
+
+@views_bp.route('/email', methods=['POST'])
+def email_route():
+    try:
+        from tasks.emailservice import send_verification_email
+        referrer = request.referrer
+        form = EmailForm(request.form)
+        if form.validate_on_submit():
+            logger.info('Form is valid, processing data')
+            email = form.email.data
+            token = 'd'
+            # Send email task
+            task = send_verification_email.apply_async(args=[email, token])
+            task_id = task.id
+            task_info_singleton = TaskInfoSingleton()
+            task_info_singleton.set_task_info(task_id, 'send_verification')
+
+            flash('Sent Subscription Message to your Inbox', 'success')
+            return jsonify({
+                "message": "Verification email is being sent.",
+                "task_id": task.id
+            }), 202 # Redirect to the current URL
+        else:
+            flash('Invalid form data. Please try again.', 'danger')
+            return redirect(referrer)
+    except Exception as e:
+        logger.error(f"Error in sending email: {str(e)}")
+        return jsonify({"error": "Failed to process the email request"}), 500
+
+
 @views_bp.route('/logout')
 def logout():
     logger.info('User initiated logout.')

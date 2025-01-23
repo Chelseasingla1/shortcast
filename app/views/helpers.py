@@ -75,6 +75,8 @@ class PreferencesForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Length(min=1, max=500)])
 
 
+
+
 #TODO : configure celery to run the transcription service and the email service
 #TODO : add pages and routes for creators to update their podcast and episodes
 #TODO : get images from freepik

@@ -3,19 +3,27 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from smtplib import SMTPException, SMTPAuthenticationError
-from celery.signals import task_success, task_failure
-from app import create_app
 import logging
+from tasks import celery
+import re
+from dotenv import load_dotenv
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
-app, celery = create_app()
 
+def is_valid_email(email):
+    email_regex = r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+    return re.match(email_regex, email)
 
-@celery.task(bind=True, max_retries=3,name="app.emailservice.emailservice.send_verification_email")
-def send_verification_email(self, email, token):
+@celery.task(bind=True, max_retries=3)
+def send_verification_email(self,email, token):
     try:
-        sender_email = os.environ.get("EMAIL_ADDR")
+
+        if not is_valid_email(email):
+            raise ValueError(f"Invalid email address: {email}")
+
+        sender_email = os.environ.get("EMAIL_ADRR")
         password = os.environ.get("EMAIL_PASS")
 
         if not sender_email or not password:
@@ -54,23 +62,7 @@ def send_verification_email(self, email, token):
 
     except (SMTPAuthenticationError, SMTPException, ValueError) as e:
         logger.error(f"Failed to send email: {str(e)}")
-        raise self.retry(exc=e)  # Optionally retry the task
+        raise self.retry(exc=e,countdown =60)  # Optionally retry the task
     except Exception as e:
         logger.error(f"An unexpected error occurred: {str(e)}")
-        raise self.retry(exc=e)  # Retry for other exceptions
-
-
-@task_success.connect
-def task_success_handler(sender=None, result=None, **kwargs):
-    """
-    Called when a task succeeds.
-    """
-    logger.info(f"Task succeeded: {sender.name}, result: {result}")
-
-
-@task_failure.connect
-def task_failure_handler(sender=None, exception=None, **kwargs):
-    """
-    Called when a task fails.
-    """
-    logger.error(f"Task failed: {sender.name}, exception: {exception}")
+        raise self.retry(exc=e,countdown =60)  # Retry for other exceptions
