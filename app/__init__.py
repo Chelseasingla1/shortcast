@@ -88,6 +88,7 @@ app.register_blueprint(users)
 app.register_blueprint(playlist_item_bp)
 
 
+
 # User loader for Flask-Login
 @login_manager.user_loader
 def load_user(user_id):

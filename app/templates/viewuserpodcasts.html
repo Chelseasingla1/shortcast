@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Your Podcasts</h2>
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        {% for podcast in podcasts %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <!-- Adjust the image styling -->
+                <img
+                    src="{{ podcast.image_url }}"
+                    class="card-img-top"
+                    alt="{{ podcast.title }}"
+                    style="height: 200px; object-fit: cover; border-bottom: 1px solid #ddd;">
+
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">{{ podcast.title }}</h5>
+                    <p class="card-text text-muted mt-auto">Description: {{podcast.description}}</p>
+                    <p class="card-text text-muted mt-auto">Created on: {{ podcast.publish_date.date() }}</p>
+
+                    <!-- Edit button -->
+                    <button type="button" class="btn btn-info mt-2" data-toggle="modal" data-target="#editPodcastModal{{ loop.index }}">
+                        <i class="fas fa-edit"></i> Edit Podcast
+                    </button>
+                </div>
+
+                <div class="card-footer text-center">
+                    <a href="{{ url_for('views.user_episodes', podcast_id=podcast.id) }}" class="btn btn-primary mb-2 w-100">
+                        Open Podcast
+                    </a>
+
+                    <form action="{{ url_for('views.user_podcasts_remove', podcast_id=podcast.id) }}" method="POST" style="display: inline;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Are you sure you want to delete this podcast?')">
+                            Delete Podcast
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Podcast Modal -->
+        <div class="modal fade" id="editPodcastModal{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="editPodcastModalLabel{{ loop.index }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content shadow-lg border-0">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title" id="editPodcastModalLabel{{ loop.index }}">
+                            <i class="fas fa-edit"></i> Edit Podcast
+                        </h5>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <form action="{{ url_for('views.update_podcast', podcast_id=podcast.id) }}" method="POST" enctype="multipart/form-data">
+    {{ form.csrf_token() }}
+    <div class="modal-body">
+
+        <div class="form-group">
+            <label for="description">Description</label>
+            {{ form.description(class="form-control", rows="4", id="description") }}
+        </div>
+        <div class="form-group">
+            <label for="image_file">Podcast Image</label>
+            {% if podcast.image_url %}
+                <img src="{{ podcast.image_url }}" alt="Podcast Image" id="previewImg{{ loop.index }}" class="preview-img rounded-circle mb-2" width="80" height="80">
+            {% endif %}
+            <div class="custom-file">
+                {{ form.image_file(class="custom-file-input", id="podcastImage{{ loop.index }}") }}
+                <label class="custom-file-label" for="podcastImage{{ loop.index }}">Choose image file</label>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer border-top-0">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+            <i class="fas fa-times"></i> Close
+        </button>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> Save Changes
+        </button>
+    </div>
+</form>
+
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if not podcasts %}
+    <div class="alert alert-info text-center mt-4">
+        You have no podcasts yet. Start by creating one!
+    </div>
+    <div class="text-center mt-4 mb-5">
+        <a href="{{ url_for('views.create_podcast') }}" class="btn btn-primary">Create New Podcast</a>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+{% block otherscripts%}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const inputs = document.querySelectorAll('.custom-file-input');
+        const previewImages = document.querySelectorAll('.preview-img');
+
+        inputs.forEach((input, index) => {
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        if (previewImages[index]) {
+                            previewImages[index].src = reader.result;
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+
+        inputs.forEach(input => {
+            input.addEventListener('change', (event) => {
+                const fileName = event.target.files[0]?.name || "Choose file";
+                const label = event.target.nextElementSibling;
+                if (label) {
+                    label.textContent = fileName;
+                }
+            });
+        });
+    });
+</script>
+
+
+{% endblock %}

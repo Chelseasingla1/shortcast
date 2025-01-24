@@ -49,6 +49,10 @@ class EpisodeForm(FlaskForm):
     publish_date = StringField('Publish Date', default=datetime.now().isoformat(), validators=[Optional()])
 
 
+class EpisodeUpdateForm(FlaskForm):
+    description = TextAreaField('Description', validators=[Optional(), Length(min=10, max=100)])
+    image_file = FileField('Upload Image File', validators=[Optional()])
+
 class PodcastForm(FlaskForm):
     image_file = FileField('Upload Image File', validators=[Optional()])
     title = StringField('Title', validators=[DataRequired(), Length(min=1, max=100)])
@@ -58,6 +62,10 @@ class PodcastForm(FlaskForm):
         'Select Categories',
     )
     duration = IntegerField('Duration (in seconds)', validators=[Optional()])
+
+class PodcastUpdateForm(FlaskForm):
+    description = TextAreaField('Description', validators=[Optional(), Length(min=10, max=100)])
+    image_file = FileField('Upload Image File', validators=[Optional()])
 
 
 class AddToPlaylistForm(FlaskForm):

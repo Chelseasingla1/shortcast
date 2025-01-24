@@ -17,7 +17,7 @@ from app.api.oauth.oauth import OauthFacade
 from app.api.users.users import update_user
 from app.model_utils import Categories
 from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm, PodcastForm, \
-    EmailForm, PreferencesForm
+    EmailForm, PreferencesForm, EpisodeUpdateForm, PodcastUpdateForm
 
 from app.models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem, User, \
     Favourite
@@ -467,6 +467,256 @@ def episode():
         logger.error(f'Failed to retrieve paginated episodes: {str(e)}')
         return render_template('episodeslist.html', pagination=None, episodes=[], playlists=playlists,email_form=email_form)
 
+@views_bp.route('/user/podcasts')
+def user_podcasts():
+    email_form = EmailForm()
+    form = PodcastUpdateForm()
+    podcasts = Podcast.query.filter_by(user_id=current_user.id).all()
+
+    return render_template('viewuserpodcasts.html',form=form, podcasts = podcasts, email_form=email_form)
+
+@views_bp.post('/user/podcasts/<int:podcast_id>')
+def user_podcasts_remove(podcast_id):
+    try:
+        # Fetch the podcast to be deleted
+        podcast = Podcast.query.get(podcast_id)
+
+        if not podcast:
+            flash('Podcast not found.', 'error')
+            return redirect(url_for('views.user_podcasts'))
+
+        # Ensure the playlist belongs to the current user
+        if podcast.user_id != current_user.id:
+            flash('You do not have permission to delete this podcast.', 'error')
+            return redirect(url_for('views.user_podcasts'))
+
+        # Delete the image from Azure storage
+        if podcast.image_url:
+            blob_name = podcast.image_url.split('/')[-1]  # Extract the blob name
+            azure_storage_instance.delete_blob(container_name, f"images/{blob_name}")
+
+        # Remove the podcast from the database
+        db.session.delete(podcast)
+        db.session.commit()
+
+        flash('Podcast removed successfully!', 'success')
+        return redirect(url_for('views.user_podcasts'))
+
+    except SQLAlchemyError as db_err:
+        db.session.rollback()
+        print(f"Database Error: {str(db_err)}")
+        flash('A database error occurred. Please try again.', 'error')
+
+    except Exception as e:
+        print(f"General Error: {str(e)}")
+        flash('An error occurred while removing the podcast. Please try again.', 'error')
+
+    return redirect(url_for('views.user_podcasts'))
+
+@views_bp.get('/user/episodes/<int:podcast_id>')
+def user_episodes(podcast_id):
+    try:
+        form = EpisodeUpdateForm()
+        email_form = EmailForm()
+        episodes = Episode.query.filter_by(podcast_id=podcast_id).all()
+
+        return render_template(
+            'viewuserepisode.html',
+            episodes=episodes,
+            form = form,
+            email_form=email_form
+        )
+    except Exception as e:
+        logger.error(str(e))
+        flash(f'An error occured ')
+        return render_template('viewuserepisode.html',
+                               email_form=email_form)
+
+@views_bp.post('/user/episodes/<int:podcast_id>/<int:episode_id>')
+def user_episodes_remove(podcast_id,episode_id):
+    try:
+        # Fetch the episode to be deleted
+
+        episode = Episode.query.get(episode_id)
+        podcast_id = podcast_id
+
+        if not episode:
+            flash('Episode not found.', 'error')
+            return redirect(url_for('views.user_episodes',podcast_id=podcast_id))
+
+        # Ensure the playlist belongs to the current user
+        if episode.podcast.user_id != current_user.id:
+            flash('You do not have permission to delete this episode.', 'error')
+            return redirect(url_for('views.user_episodes',podcast_id=podcast_id))
+
+        try:
+            # Delete the image from Azure storage if it exists
+            if episode.image_url:
+                blob_name = episode.image_url.split('/')[-1]  # Extract the blob name
+                try:
+                    azure_storage_instance.delete_blob(container_name, f"images/{blob_name}")
+                except Exception as e:
+                    logger.error(f"Failed to delete image blob: {str(e)}")
+                    flash('Failed to delete the episode image.', 'error')
+
+            # Delete the audio from Azure storage if it exists
+            if episode.audio_url:
+                blob_name = episode.audio_url.split('/')[-1]  # Extract the blob name
+                try:
+                    azure_storage_instance.delete_blob(container_name, f"audio/{blob_name}")
+                except Exception as e:
+                    logger.error(f"Failed to delete audio blob: {str(e)}")
+                    flash('Failed to delete the episode audio.', 'error')
+
+        except Exception as e:
+            logger.error(f"Error in Azure blob deletion: {str(e)}")
+            flash('An error occurred while deleting media from Azure.', 'error')
+
+        # Remove the episode from the database
+        db.session.delete(episode)
+        db.session.commit()
+
+        flash('Episode removed successfully!', 'success')
+        return redirect(url_for('views.user_episodes',podcast_id=podcast_id))
+
+    except SQLAlchemyError as db_err:
+        db.session.rollback()
+        logger.error(f"Database Error: {str(db_err)}")
+        flash('A database error occurred. Please try again.', 'error')
+
+    except Exception as e:
+        logger.error(f"General Error: {str(e)}")
+        flash('An error occurred while removing the episode. Please try again.', 'error')
+
+    return redirect(url_for('views.user_episodes'))
+
+
+@views_bp.post('/update/episode/<int:episode_id>')
+def update_episodes(episode_id):
+    episode = Episode.query.filter_by(id=episode_id).first()
+    if not episode:
+        flash("Episode not found.", "error")
+        return redirect(url_for('views.user_episodes', podcast_id=episode.podcast.id))
+
+    form = EpisodeUpdateForm()
+    if form.validate_on_submit():
+        logger.info("Form is valid, processing data.")
+        image_url = None
+        description = form.description.data
+
+        if form.image_file.data:
+            try:
+                image_file = form.image_file.data
+                original_filename = secure_filename(image_file.filename)
+                unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+                file_path = os.path.join('/tmp', unique_filename)
+
+                # Save file temporarily
+                image_file.save(file_path)
+
+                # Upload to Azure
+                blob_name = f"images/{unique_filename}"
+                image_url = azure_storage_instance.upload_blob(container_name, blob_name, file_path)
+
+                # Clean up temporary file
+                os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Error uploading image: {e}")
+                flash(f"Error uploading image: {e}", "error")
+                return redirect(url_for('views.user_episodes', podcast_id=episode.podcast.id))
+
+        try:
+            # Delete the previous image from Azure storage if it exists
+            if episode.image_url:
+                blob_name = episode.image_url.split('/')[-1]  # Extract the blob name
+                try:
+                    azure_storage_instance.delete_blob(container_name, f"images/{blob_name}")
+                except Exception as e:
+                    logger.error(f"Failed to delete image blob: {str(e)}")
+                    flash('Failed to delete the episode image.', 'error')
+
+            if description:
+                episode.description = description
+            if image_url:
+                episode.image_url = image_url
+
+            db.session.commit()  # Commit changes to the database
+            flash("Episode updated successfully.", "success")
+        except Exception as e:
+            logger.error(f"Database update failed: {e}")
+            db.session.rollback()
+            flash("Failed to update episode.", "error")
+
+    else:
+        logger.warning("Form validation failed.")
+        flash("Invalid input, please check the form.", "error")
+
+    return redirect(url_for('views.user_episodes', podcast_id=episode.podcast.id))
+
+
+@views_bp.post('/update/podcast/<int:podcast_id>')
+def update_podcast(podcast_id):
+    podcast = Podcast.query.filter_by(id=podcast_id).first()
+    if not podcast:
+        flash("Podcast not found.", "error")
+        return redirect(url_for('views.user_podcasts'))
+
+    form = PodcastUpdateForm()
+    if form.validate_on_submit():
+        logger.info("Form is valid, processing data.")
+        image_url = None
+        description = form.description.data
+
+        if form.image_file.data:
+            try:
+                image_file = form.image_file.data
+                original_filename = secure_filename(image_file.filename)
+                unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
+                file_path = os.path.join('/tmp', unique_filename)
+
+                # Save file temporarily
+                image_file.save(file_path)
+
+                # Upload to Azure
+                blob_name = f"images/{unique_filename}"
+                image_url = azure_storage_instance.upload_blob(container_name, blob_name, file_path)
+
+                # Clean up temporary file
+                os.remove(file_path)
+            except Exception as e:
+                logger.error(f"Error uploading image: {e}")
+                flash(f"Error uploading image: {e}", "error")
+                return redirect(url_for('views.user_podcasts'))
+
+        try:
+            # Delete the previous image from Azure storage if it exists
+            if image_url:
+                if podcast.image_url:
+                    blob_name = podcast.image_url.split('/')[-1]  # Extract the blob name
+                    try:
+                        azure_storage_instance.delete_blob(container_name, f"images/{blob_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to delete image blob: {str(e)}")
+                        flash("Failed to delete the podcast image.", "error")
+
+            # Update podcast details
+            if description:
+                podcast.description = description
+            if image_url:
+                podcast.image_url = image_url
+
+            db.session.commit()  # Commit changes to the database
+            flash("Podcast updated successfully.", "success")
+        except Exception as e:
+            logger.error(f"Database update failed: {e}")
+            db.session.rollback()
+            flash("Failed to update podcast.", "error")
+
+    else:
+        logger.warning("Form validation failed.")
+        flash("Invalid input, please check the form.", "error")
+
+    return redirect(url_for('views.user_podcasts'))
 
 # route to view live podcasts
 @views_bp.route('/live-podcasts')

@@ -174,10 +174,10 @@
                         </div>
                     <div class="modal-body">
                         <!--transcription details go here               -->
-                        {%if not transcription%}
+                        {%if not episode.transcription%}
                         <p>Transcription not available</p>
                         {%else%}
-                        <p>{{transcription}}</p>
+                        <p class="text-secondary">{{episode.transcription}}</p>
                         {%endif%}
                     </div>
                     <div class="modal-footer border-top-0">
