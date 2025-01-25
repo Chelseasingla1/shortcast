@@ -1,7 +1,7 @@
 import os
 import uuid
 import requests
-from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify,current_app
+from flask import Blueprint, render_template, request, url_for, session, redirect, flash, jsonify
 from flask_login import current_user, logout_user,login_required
 import logging
 from dotenv import load_dotenv
@@ -14,16 +14,12 @@ from difflib import SequenceMatcher
 from app.api.auth import login_user_
 from app.api.azureops.azureapi import azure_storage_instance
 from app.api.oauth.oauth import OauthFacade
-from app.api.users.users import update_user
-from app.model_utils import Categories
-from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm, AddToPlaylistForm, PodcastForm, \
-    EmailForm, PreferencesForm, EpisodeUpdateForm, PodcastUpdateForm
+from app.model_utils import Categories,categories_details
+from app.views.helpers import get_authentication_links, PlaylistForm, EpisodeForm,PodcastForm,EmailForm, PreferencesForm, EpisodeUpdateForm, PodcastUpdateForm
 
 from app.models import Podcast, Episode, SharedPlaylist, db, Playlist, PlaylistItem, PlaylistPlaylistitem, User, \
     Favourite
 from app.api.azureops.azureclass import AzureBlobStorage
-from app.views.dbfuncs import add_episode_to_playlist
-# from app.views.emailservice import send_verification_email
 from task_singleton import TaskInfoSingleton
 
 load_dotenv()
@@ -53,8 +49,10 @@ def index():
         {'text': 'Contact', 'url': url_for('views.contact'), 'active': False},
         {'text': 'Login / Register', 'url': url_for('views.login'), 'active': False}
     ]
-    popular_episode = []
 
+
+
+    most_popular_episodes = []
     latest_episodes = []
     shared_playlists = []
     email_form = EmailForm()
@@ -96,7 +94,8 @@ def index():
         top_episodes=most_popular_episodes,
         latest_episodes=latest_episodes,
         shared_playlist=shared_playlists,
-        email_form=email_form
+        email_form=email_form,
+        categories=categories_details
     )
 
 # Route to create a new podcast
@@ -185,6 +184,7 @@ def create_episode():
     image_url = None
     audio_url = None
     audio_file_path = None
+    blob_name = None
     # form validation
     if form.validate_on_submit():
 
@@ -358,8 +358,13 @@ def callback_route():
 @views_bp.route('/podcasts')
 @login_required
 def podcast():
+    email_form = EmailForm()
+    podcasts = []
+    playlists = []
+    category_names = []
+    pagination = None
     try:
-        email_form = EmailForm()
+
         page = request.args.get('page', 1, type=int)
         per_page = 10
 
@@ -372,6 +377,7 @@ def podcast():
         end_date = request.args.get('end_date')
 
         query = Podcast.query
+
         playlists = Playlist.query.filter_by(user_id=current_user.id).all()
         if category:
             print(Podcast.category.name)
@@ -398,13 +404,15 @@ def podcast():
 
     except Exception as e:
         logger.error(f'Failed to retrieve paginated podcasts: {str(e)}')
-        return render_template('podcastlist.html', pagination=None, podcasts=[], playlists=playlists)
+        return render_template('podcastlist.html', pagination=pagination, podcasts=podcasts, playlists=playlists,email_form=email_form,categories=category_names)
 
 
 # route to view all the published episodes in a podcast
 @views_bp.route('/episodes')
-@login_required
+# @login_required
 def episode():
+    playlists  = []
+    episodes = []
     try:
         email_form = EmailForm()
         page = request.args.get('page', 1, type=int)
@@ -461,13 +469,12 @@ def episode():
 
     except Exception as e:
         flash(f"An error occurred: {e}", "danger")
-        return redirect(url_for('views.podcast'))
-
-    except Exception as e:
         logger.error(f'Failed to retrieve paginated episodes: {str(e)}')
-        return render_template('episodeslist.html', pagination=None, episodes=[], playlists=playlists,email_form=email_form)
+        return render_template('episodeslist.html', pagination=None, episodes=episodes, playlists=playlists,email_form=email_form)
+
 
 @views_bp.route('/user/podcasts')
+@login_required
 def user_podcasts():
     email_form = EmailForm()
     form = PodcastUpdateForm()
@@ -492,6 +499,7 @@ def user_podcasts_remove(podcast_id):
 
         # Delete the image from Azure storage
         if podcast.image_url:
+
             blob_name = podcast.image_url.split('/')[-1]  # Extract the blob name
             azure_storage_instance.delete_blob(container_name, f"images/{blob_name}")
 
@@ -729,6 +737,63 @@ def live_podcast():
 @views_bp.route('/createplaylist', methods=['GET', 'POST'])
 @login_required
 def create_playlist():
+    """
+    Create a new playlist for the current user.
+
+    This route allows an authenticated user to create a new playlist by providing a title and an image. The image is
+    uploaded to Azure Blob Storage, and the playlist is saved in the database.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: title
+        in: formData
+        description: The title of the playlist.
+        required: true
+        type: string
+        example: 'My Favorite Episodes'
+      - name: image
+        in: formData
+        description: The image file to represent the playlist.
+        required: true
+        type: file
+    responses:
+      200:
+        description: Successfully created the playlist with an image uploaded.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Playlist created and saved successfully!'
+            playlist:
+              type: object
+              properties:
+                title:
+                  type: string
+                  example: 'My Favorite Episodes'
+                image_url:
+                  type: string
+                  example: 'https://azure.blobstorage.url/images/unique_filename.jpg'
+      400:
+        description: Missing or invalid data provided in the form.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'No image file provided.'
+      500:
+        description: A database or unexpected error occurred during playlist creation.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'An error occurred while creating the playlist. Please try again.'
+    """
+
     form = PlaylistForm()  # Initialize the form
     email_form = EmailForm()
     if form.validate_on_submit():
@@ -791,6 +856,49 @@ def create_playlist():
 @views_bp.route('/removeplaylist/<int:playlist_id>', methods=['POST'])
 @login_required
 def remove_playlist(playlist_id):
+    """
+    Remove a playlist created by the current user.
+
+    This route allows the current authenticated user to delete a playlist they created. If the playlist has an associated
+    image, it will be deleted from Azure storage before removing the playlist from the database.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: playlist_id
+        in: path
+        description: The ID of the playlist to be removed.
+        required: true
+        schema:
+          type: integer
+    responses:
+      200:
+        description: Successfully removed the playlist.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Playlist removed successfully!'
+      400:
+        description: Playlist not found or deletion permission denied.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'You do not have permission to delete this playlist.'
+      500:
+        description: A database error occurred or an unexpected issue during playlist removal.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'An error occurred while removing the playlist. Please try again.'
+    """
+
     try:
         # Fetch the playlist to be deleted
         playlist = Playlist.query.get(playlist_id)
@@ -831,6 +939,39 @@ def remove_playlist(playlist_id):
 @views_bp.get('/playlists')
 @login_required
 def user_playlists():
+    """
+    Retrieve a list of playlists belonging to the current user.
+
+    This route fetches and displays all playlists created by the currently authenticated user. The playlists are rendered
+    on a webpage, where users can view the titles and other details of their playlists.
+
+    ---
+    tags:
+      - Playlist
+    responses:
+      200:
+        description: Successfully retrieved the list of user playlists.
+        schema:
+          type: object
+          properties:
+            playlists:
+              type: array
+              items:
+                type: object
+                description: List of playlists belonging to the current user.
+            email_form:
+              type: object
+              description: The email form object to be rendered in the template.
+      401:
+        description: Unauthorized access, the user needs to be logged in to view playlists.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'User must be logged in to view playlists.'
+    """
+
     # Fetch all playlists belonging to the current user
     email_form = EmailForm()
     playlists = Playlist.query.filter_by(user_id=current_user.id).all()
@@ -841,6 +982,64 @@ def user_playlists():
 
 @views_bp.get('/open_playlist/<int:playlist_id>')
 def open_playlist(playlist_id):
+    """
+    Open a specific playlist with its episodes and related information.
+
+    This route allows the user to view the details of a playlist, including episodes in the playlist.
+    The user can also search for specific episodes by title. Favourites and their states are also displayed.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: playlist_id
+        in: path
+        type: integer
+        required: true
+        description: The ID of the playlist to be opened.
+      - name: title
+        in: query
+        type: string
+        required: false
+        description: A search term to filter episodes by title (case-insensitive).
+    responses:
+      200:
+        description: Successfully retrieved the playlist and its episodes.
+        schema:
+          type: object
+          properties:
+            playlist_items:
+              type: array
+              items:
+                type: object
+                description: List of episodes in the playlist
+            playlist:
+              type: object
+              description: The playlist details (ID, title, user, etc.)
+            favourite_counts:
+              type: object
+              description: Mapping of episode IDs to the number of favourites.
+            favourite_state:
+              type: object
+              description: Mapping of episode IDs to the current user's favourite state (True/False).
+      400:
+        description: Invalid or missing playlist ID or other request-related issues.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Playlist not found.'
+      500:
+        description: An unexpected error occurred.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'An error occurred while retrieving the playlist.'
+    """
+
     try:
         email_form=EmailForm()
         title_search = request.args.get('title')
@@ -887,6 +1086,66 @@ def open_playlist(playlist_id):
 @views_bp.route('/add_to_playlist', methods=['POST'])
 @login_required
 def add_to_playlist():
+    """
+    Add an episode to a playlist.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: episode_id
+        in: body
+        type: integer
+        required: true
+        description: The ID of the episode to be added to the playlist.
+      - name: playlist_id
+        in: body
+        type: integer
+        required: true
+        description: The ID of the playlist to which the episode should be added.
+    responses:
+      201:
+        description: Episode successfully added to the playlist.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Episode added to playlist successfully'
+      200:
+        description: Episode already exists in the playlist.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Episode already exists in playlist'
+      400:
+        description: Missing required data or invalid data provided.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'episode_id and playlist_id are required'
+      404:
+        description: Playlist or episode not found.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'playlist or episode not found'
+      500:
+        description: An unexpected error occurred.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'An unexpected error occurred: <error_details>'
+    """
+
     try:
         # Parse JSON data from the request
         data = request.json
@@ -957,6 +1216,58 @@ def add_to_playlist():
 @views_bp.route('/remove_from_playlist', methods=['GET','DELETE'])
 @login_required
 def remove_from_playlist():
+    """
+    Remove an episode from a playlist.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: episode_id
+        in: body
+        type: integer
+        required: true
+        description: The ID of the episode to be removed from the playlist.
+      - name: playlist_id
+        in: body
+        type: integer
+        required: true
+        description: The ID of the playlist from which the episode is to be removed.
+    responses:
+      200:
+        description: Successfully removed the episode from the playlist.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Episode removed from playlist successfully'
+      400:
+        description: Missing required data or invalid data provided.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'episode_id and playlist_id are required'
+      404:
+        description: Playlist or episode not found, or episode not found in the playlist.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'Episode not found in the playlist'
+      500:
+        description: An unexpected error occurred.
+        schema:
+          type: object
+          properties:
+            msg:
+              type: string
+              example: 'An unexpected error occurred: <error_details>'
+    """
+
     try:
         # Parse JSON data from the request
         data = request.json
@@ -1017,6 +1328,48 @@ def remove_from_playlist():
 @views_bp.route('/playlist/<int:playlist_id>/episodes', methods=['GET'])
 @login_required
 def playlist_episodes(playlist_id):
+    """
+    Get all episodes in a specific playlist.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: playlist_id
+        in: path
+        type: integer
+        required: true
+        description: The ID of the playlist whose episodes are to be retrieved.
+    responses:
+      200:
+        description: Successfully retrieved the episodes in the playlist.
+        schema:
+          type: object
+          properties:
+            playlist:
+              type: object
+              description: Playlist details
+            episodes:
+              type: array
+              items:
+                type: object
+                description: Episode details
+      404:
+        description: Playlist not found.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Playlist not found'
+            data:
+              type: object
+              example: null
+    """
+
     # Fetch the playlist by its ID
     playlist = Playlist.query.get(playlist_id)
 
@@ -1035,6 +1388,49 @@ def playlist_episodes(playlist_id):
 @views_bp.route('/delete_playlist/<int:playlist_id>', methods=['POST'])
 @login_required
 def delete_playlist(playlist_id):
+    """
+    Delete a playlist and its associated items.
+
+    ---
+    tags:
+      - Playlist
+    parameters:
+      - name: playlist_id
+        in: path
+        type: integer
+        required: true
+        description: The ID of the playlist to be deleted.
+    responses:
+      200:
+        description: Successfully deleted the playlist and its associated items.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'success'
+            message:
+              type: string
+              example: 'Playlist deleted successfully'
+            data:
+              type: object
+              example: null
+      404:
+        description: Playlist not found.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Playlist not found'
+            data:
+              type: object
+              example: null
+    """
+
     playlist = Playlist.query.get_or_404(playlist_id)
 
     # Deleting associated PlaylistItems from PlaylistPlaylistitem relationship
@@ -1050,6 +1446,80 @@ def delete_playlist(playlist_id):
 @views_bp.post('/favourite')
 @login_required
 def add_favourite():
+    """
+    Add an episode to the user's favourites.
+
+    ---
+    tags:
+      - Favourite
+    parameters:
+      - name: episode_id
+        in: body
+        type: string
+        required: true
+        description: The ID of the episode to add to favourites.
+    responses:
+      201:
+        description: Successfully added the episode to favourites.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'success'
+            message:
+              type: string
+              example: 'Added to favourites'
+            data:
+              type: object
+              example: null
+      400:
+        description: Missing episode ID in the request.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Episode ID is required'
+            data:
+              type: object
+              example: null
+      409:
+        description: Episode is already in the user's favourites.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Already in favourites'
+            data:
+              type: object
+              example: null
+      500:
+        description: Error when adding the episode to favourites.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Favourite action failed'
+            error_code:
+              type: string
+              example: 'SERVER ERROR'
+            data:
+              type: object
+              example: null
+    """
+
     data = request.json
     episode_id = data.get('episode_id')
 
@@ -1080,6 +1550,80 @@ def add_favourite():
 @views_bp.delete('/favourite')
 @login_required
 def remove_favourite():
+    """
+    Remove an episode from the user's favourites.
+
+    ---
+    tags:
+      - Favourite
+    parameters:
+      - name: episode_id
+        in: body
+        type: string
+        required: true
+        description: The ID of the episode to remove from favourites.
+    responses:
+      201:
+        description: Successfully removed the episode from favourites.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'success'
+            message:
+              type: string
+              example: 'removed from favourites'
+            data:
+              type: object
+              example: null
+      400:
+        description: Missing episode ID in the request.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Episode ID is required'
+            data:
+              type: object
+              example: null
+      404:
+        description: Episode not found in the user's favourites.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'not found'
+            data:
+              type: object
+              example: null
+      500:
+        description: Error when removing the favourite.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Favourite action failed'
+            error_code:
+              type: string
+              example: 'SERVER ERROR'
+            data:
+              type: object
+              example: null
+    """
+
     data = request.json
     episode_id = data.get('episode_id')
 
@@ -1107,6 +1651,66 @@ def remove_favourite():
 @views_bp.get('/favourite')
 @login_required
 def get_episode_favourites():
+    """
+    Retrieve the number of favourites (likes) for a specific episode.
+
+    ---
+    tags:
+      - Favourite
+    parameters:
+      - name: episode_id
+        in: query
+        type: string
+        required: true
+        description: The ID of the episode to retrieve the favourite count for.
+    responses:
+      200:
+        description: Successfully retrieved the number of favourites.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'success'
+            message:
+              type: string
+              example: 'Retrieved number of likes'
+            data:
+              type: integer
+              example: 42
+      400:
+        description: Missing episode ID in the request.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Episode ID is required'
+            data:
+              type: object
+              example: null
+      500:
+        description: Error when retrieving the favourite count.
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: 'error'
+            message:
+              type: string
+              example: 'Favourite action failed'
+            error_code:
+              type: string
+              example: 'SERVER ERROR'
+            data:
+              type: object
+              example: null
+    """
+
     # Get episode_id from query parameters
     episode_id = request.args.get('episode_id')
 
@@ -1129,10 +1733,61 @@ def get_episode_favourites():
 
 @views_bp.route('/preferences',methods=['GET','PUT'])
 def preferences():
+
+    """
+    User preferences update (GET/PUT).
+
+    ---
+    tags:
+      - Preferences
+    parameters:
+      - name: username
+        in: formData
+        type: string
+        required: false
+        description: The username to update.
+      - name: email
+        in: formData
+        type: string
+        required: false
+        description: The email address to update.
+      - name: avatar
+        in: formData
+        type: file
+        required: false
+        description: The avatar image to upload (if provided).
+    responses:
+      200:
+        description: User preferences updated successfully.
+        schema:
+          type: object
+          properties:
+            message:
+              type: string
+              example: 'Updated preferences'
+      400:
+        description: Error updating user preferences or file upload failure.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: 'Error uploading image: <error_message>'
+      500:
+        description: Internal server error during database operation.
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: 'Error updating preferences'
+    """
+
     email_form = EmailForm()
     form = PreferencesForm()
     username= None
     email = None
+    blob_name = None
 
     if form.validate_on_submit():
         logging.info("Form is valid,processing data")
@@ -1228,10 +1883,49 @@ def email_route():
         logger.error(f"Error in sending email: {str(e)}")
         return jsonify({"error": "Failed to process the email request"}), 500
 
+@views_bp.route('/categories')
+def categories():
+    """
+    Displays the categories page where users can view different categories and submit their email.
+
+    This route performs the following actions:
+    - Retrieves the form for submitting an email (`EmailForm`).
+    - Retrieves category details from the `categories_details` variable (or any source it's derived from).
+    - Renders the `categories.html` template, passing the email form and category details for display.
+
+    Context Provided to Template:
+        - email_form: The form for the user to submit their email.
+        - categories: A list or dictionary of category details that will be displayed on the page.
+
+    Returns:
+        render_template: Renders the `categories.html` template with the provided context.
+    """
+    email_form = EmailForm()
+    category_details = categories_details
+    return render_template('categories.html', email_form=email_form, categories=category_details)
 
 
 @views_bp.route('/logout')
 def logout():
+    """
+    Logs the user out of the application, invalidates the GitHub OAuth token if it exists,
+    and clears the session.
+
+    This route performs the following actions:
+    - Logs the user out of the Flask app by calling `logout_user()`.
+    - If an OAuth token exists in the session, it attempts to invalidate the token
+      by sending a DELETE request to the GitHub OAuth application API.
+    - Clears any session data related to the OAuth token.
+    - Displays a success message via `flash` indicating that the user has been logged out.
+    - Redirects the user to the home page after logout.
+
+    Responses:
+        - 200: Successfully logged out and invalidated GitHub OAuth token.
+        - 400: Error occurred while invalidating the GitHub OAuth token.
+
+    Returns:
+        redirect: Redirects to the home page (`views.index`).
+    """
     logger.info('User initiated logout.')
 
     flash('You have been logged out successfully.', 'success')

@@ -1,98 +1,107 @@
 {% extends 'base.html' %}
 
 {% block content %}
- <div class="site-wrap">
-    <div class="site-blocks-cover overlay inner-page-cover" style="background-image: url(/static/images/hero_bg_1.jpg);" data-aos="fade" data-stellar-background-ratio="0.5">
-      <div class="container">
-        <div class="row align-items-center justify-content-center text-center">
+  <div class="site-wrap">
 
-          <div class="col-md-6" data-aos="fade-up" data-aos-delay="400">
-            <h1 class="text-white">Contact Us</h1>
-            <a href="{{ url_for("views.index") }}">Home</a><span class="mx-2 text-white">&bullet;</span> <span class="text-white">Contact</span>
-          </div>
+    <!-- Hero Section -->
+    <div class="container pt-5 hero">
+      <div class="row align-items-center text-center text-md-left">
+        <div class="col-lg-6">
+          <h1 class="display-3 text-dark mb-3">Contact Us</h1>
+          <p class="lead">We're here to help! Reach out to us with any questions or comments you have.</p>
         </div>
-      </div>
-    </div>  
-
-    <div class="site-section">
-      <div class="container" data-aos="fade-up">
-        <div class="row">
-          <div class="col-md-7 mb-5">
-            <form action="#" method="post" class="bg-white">
-              
-              <div class="">
-                <div class="form-group row">
-                  <div class="col-md-6">
-                    <label for="c_fname" class="text-black">First Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="c_fname" name="c_fname">
-                  </div>
-                  <div class="col-md-6">
-                    <label for="c_lname" class="text-black">Last Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="c_lname" name="c_lname">
-                  </div>
-                </div>
-                <div class="form-group row">
-                  <div class="col-md-12">
-                    <label for="c_email" class="text-black">Email <span class="text-danger">*</span></label>
-                    <input type="email" class="form-control" id="c_email" name="c_email" placeholder="">
-                  </div>
-                </div>
-                <div class="form-group row">
-                  <div class="col-md-12">
-                    <label for="c_subject" class="text-black">Subject </label>
-                    <input type="text" class="form-control" id="c_subject" name="c_subject">
-                  </div>
-                </div>
-
-                <div class="form-group row">
-                  <div class="col-md-12">
-                    <label for="c_message" class="text-black">Message </label>
-                    <textarea name="c_message" id="c_message" cols="30" rows="7" class="form-control"></textarea>
-                  </div>
-                </div>
-                <div class="form-group row">
-                  <div class="col-lg-12">
-                    <input type="submit" class="btn btn-primary btn-lg" value="Send Message">
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-          <div class="col-md-5">
-            <div class="p-4 mb-3 bg-white">
-              <p class="mb-0">Address</p>
-              <a class="mb-4" href="https://github.com/jerrygeorge360">Github</a>
-
-              <p class="mb-0">Email Address</p>
-              <p class="mb-4"><a href="#">jbotrex@gmail.com</a></p>
-
-            </div>
-            
-          </div>
+        <div class="col-lg-6">
+          <img src="static/assets/4569369.jpg" alt="Image" class="img-fluid rounded shadow">
         </div>
       </div>
     </div>
 
-    
+    <!-- Contact Form Section -->
+    <div class="site-section py-5">
+      <div class="container" data-aos="fade-up">
+        <div class="row">
+
+          <!-- Contact Form -->
+          <div class="col-md-7 mb-5">
+            <form action="#" method="post" class="bg-white p-5 shadow rounded">
+
+              <h3 class="mb-4 text-dark">Send Us a Message</h3>
+
+              <div class="form-group row">
+                <div class="col-md-6">
+                  <label for="c_fname" class="text-black">First Name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="c_fname" name="c_fname" required>
+                </div>
+                <div class="col-md-6">
+                  <label for="c_lname" class="text-black">Last Name <span class="text-danger">*</span></label>
+                  <input type="text" class="form-control" id="c_lname" name="c_lname" required>
+                </div>
+              </div>
+
+              <div class="form-group row">
+                <div class="col-md-12">
+                  <label for="c_email" class="text-black">Email <span class="text-danger">*</span></label>
+                  <input type="email" class="form-control" id="c_email" name="c_email" required>
+                </div>
+              </div>
+
+              <div class="form-group row">
+                <div class="col-md-12">
+                  <label for="c_subject" class="text-black">Subject</label>
+                  <input type="text" class="form-control" id="c_subject" name="c_subject">
+                </div>
+              </div>
+
+              <div class="form-group row">
+                <div class="col-md-12">
+                  <label for="c_message" class="text-black">Message</label>
+                  <textarea name="c_message" id="c_message" cols="30" rows="7" class="form-control"></textarea>
+                </div>
+              </div>
+
+              <div class="form-group row">
+                <div class="col-lg-12">
+                  <button type="submit" class="btn btn-primary btn-lg w-100">Send Message</button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Contact Info Section -->
+          <div class="col-md-5">
+            <div class="p-4 mb-3 bg-white rounded shadow">
+              <h4 class="text-black">Get in Touch</h4>
+              <p><strong>Address:</strong>Online</p>
+              <p><strong>GitHub:</strong> <a href="https://github.com/jerrygeorge360" target="_blank">jerrygeorge360</a></p>
+              <p><strong>Email:</strong> <a href="mailto:jbotrex@gmail.com">jbotrex@gmail.com</a></p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Subscription Section -->
     <div class="site-blocks-cover overlay inner-page-cover" style="background-image: url(/static/images/hero_bg_1.jpg);" data-aos="fade" data-stellar-background-ratio="0.5">
       <div class="container">
         <div class="row align-items-center justify-content-center text-center">
 
           <div class="col-md-6" data-aos="fade-up" data-aos-delay="400">
-            <h2>Subscribe</h2>
-            <p class="mb-5">Stay updated with the latest content! Subscribe now and never miss an episode</p>
+            <h2 class="text-white">Subscribe</h2>
+            <p class="mb-5 text-white">Stay updated with the latest content! Subscribe now and never miss an episode.</p>
             <form action="#" method="post" class="site-block-subscribe">
-                <div class="input-group mb-3">
-                  <input type="text" class="form-control border-secondary text-white bg-transparent" placeholder="Enter Email" aria-label="Enter Email" aria-describedby="button-addon2">
-                  <div class="input-group-append">
-                    <button class="btn btn-primary" type="button" id="button-addon2">Send</button>
-                  </div>
+              <div class="input-group mb-3">
+                <input type="email" class="form-control border-secondary text-white bg-transparent" placeholder="Enter Your Email" aria-label="Enter Email">
+                <div class="input-group-append">
+                  <button class="btn btn-primary" type="submit" id="button-addon2">Subscribe</button>
                 </div>
-              </form>
+              </div>
+            </form>
           </div>
+
         </div>
       </div>
-    </div>  
+    </div>
 
   </div>
 {% endblock %}

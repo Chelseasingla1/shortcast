@@ -1,0 +1,33 @@
+{%extends 'base.html'%}
+
+{%block content%}
+
+<section class="container py-5">
+  <h2 class="text-center mb-4">All Podcast Categories</h2>
+  <div class="input-group mb-4">
+    <input type="text" class="form-control" placeholder="Search categories..." />
+    <button class="btn btn-primary">Search</button>
+  </div>
+
+  <div class="row g-3">
+          {%for category in categories%}
+    <div class="col-md-4">
+      <div class="card text-center shadow-sm">
+        <div class="card-body">
+          <i class="bi {{category.icon|safe}} fs-1 {{ 'text-primary' if loop.index % 3 == 1 else ('text-info' if loop.index % 3 == 2 else 'text-success') }}"></i>
+          <h5 class="card-title">{{category.name|safe}}</h5>
+            <p class="card-text text-muted">{{category.description|safe}}</p>
+          <a href="{{url_for('views.podcast',category=category.name.replace(' ', '_').upper())}}" class="btn btn-outline-{{ 'primary' if loop.index % 3 == 1 else ('info' if loop.index % 3 == 2 else 'success') }}">Explore</a>
+        </div>
+      </div>
+    </div>
+      {%endfor%}
+
+  </div>
+
+
+</section>
+
+{%endblock%}
+
+

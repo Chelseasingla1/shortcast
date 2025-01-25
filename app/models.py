@@ -5,6 +5,7 @@ from sqlalchemy.sql import func
 from app.model_utils import Providers, Roles, Categories, Shared
 from flask_login import UserMixin
 
+from flask_admin.contrib.sqla import ModelView
 
 class Base(DeclarativeBase):
     ...
@@ -320,3 +321,15 @@ class PlaylistPlaylistitem(db.Model):
             'playlist_id': self.playlist_id,
             'playlist_item_id': self.playlist_item_id
         }
+
+
+models = {User,Podcast,Episode,Subscription,Favourite,Rating,Download,Playlist,PlaylistItem,SharedPlaylist,PlaylistPlaylistitem}
+def register_models(admin_obj, models: set):
+    for model in models:
+        # Use model.__name__ to generate a unique name
+        model_name = model.__name__.lower()  # Convert model name to lowercase
+        admin_obj.add_view(
+            ModelView(model, db.session,
+                      name=f'{model_name} table',
+                      endpoint=f'{model_name}_view')
+        )

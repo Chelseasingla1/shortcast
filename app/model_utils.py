@@ -28,6 +28,33 @@ class Categories(Enum):
     CRIME = auto()
     TV_AND_FILM = auto()
 
+category_details = {
+    Categories.ARTS_AND_CULTURE: {'icon': 'bi-palette', 'description': 'Art and culture-related content'},
+    Categories.BUSINESS: {'icon': 'bi-briefcase', 'description': 'Business and finance-related content'},
+    Categories.COMEDY: {'icon': 'bi-emoji-smile', 'description': 'Comedy and entertainment content'},
+    Categories.EDUCATION: {'icon': 'bi-book', 'description': 'Educational and learning content'},
+    Categories.FICTION: {'icon': 'bi-bookmark', 'description': 'Fictional stories and books'},
+    Categories.HEALTH_AND_FITNESS: {'icon': 'bi-heart', 'description': 'Health and fitness content'},
+    Categories.KIDS_AND_FAMILY: {'icon': 'bi-house-door', 'description': 'Family and children-related content'},
+    Categories.LEISURE: {'icon': 'bi-house', 'description': 'Leisure and hobbies content'},
+    Categories.NEWS_AND_POLITICS: {'icon': 'bi-newspaper', 'description': 'News and political content'},
+    Categories.RELIGION: {'icon': 'bi-cloud-sun', 'description': 'Religious content'},
+    Categories.SCIENCE: {'icon': 'bi-lightbulb', 'description': 'Scientific content'},
+    Categories.SOCIETY: {'icon': 'bi-people', 'description': 'Social and societal topics'},
+    Categories.SPORTS: {'icon': 'bi-trophy', 'description': 'Sports and athletics content'},
+    Categories.CRIME: {'icon': 'bi-shield-lock', 'description': 'Crime and investigative content'},
+    Categories.TV_AND_FILM: {'icon': 'bi-tv', 'description': 'Movies and TV-related content'},
+}
+
+categories_details = [
+    {
+        'name': category.name.replace('_', ' ').title(),
+        'icon': category_details[category]['icon'],
+        'description': category_details[category]['description']
+    }
+    for category in Categories
+]
+
 
 class Shared(Enum):
     MODERATOR = auto()

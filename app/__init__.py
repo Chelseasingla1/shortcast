@@ -1,7 +1,9 @@
 import os
 import logging
 from datetime import timedelta
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template,flash,redirect,url_for
+
+
 from celerysetup import make_celery
 
 
@@ -9,16 +11,20 @@ from flask_wtf.csrf import CSRFProtect
 from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_login import LoginManager
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
 from flasgger import Swagger
+from  flask_socketio import SocketIO
 
-from app.models import db, User
+from app.models import db, User,register_models,models
 from app.model_utils import *
 
 from dotenv import load_dotenv
 
 load_dotenv()
 app = Flask(__name__)
-
+socketio = SocketIO()
+socketio.init_app(app)
 # Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,10 +52,12 @@ migrate = Migrate(app, db)
 CORS(app)
 CSRFProtect(app)
 Swagger(app)
+admin = Admin(app, name='Dashboard', template_mode='bootstrap3')
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'views.login'
+
 
 
 import tasks
@@ -69,7 +77,7 @@ from app.api.sharedplaylist.sharedplaylist import shared_playlist
 from app.api.subscription.subscription import subscription
 from app.api.azureops.azureapi import azure_api
 from app.api.users.users import users
-
+from app.livepodcast.views import live_podcast
 # Register Blueprints
 app.register_blueprint(views_bp)
 app.register_blueprint(auth)
@@ -86,8 +94,9 @@ app.register_blueprint(shared_playlist)
 app.register_blueprint(subscription)
 app.register_blueprint(users)
 app.register_blueprint(playlist_item_bp)
+app.register_blueprint(live_podcast)
 
-
+register_models(admin_obj=admin,models=models)
 
 # User loader for Flask-Login
 @login_manager.user_loader
@@ -105,30 +114,17 @@ def page_not_found(e):
     return render_template('404.html'), 404
 
 
-# @celery.task
-# def add_numbers(a, b):
-#     return a + b
+@login_manager.unauthorized_handler
+def unauthorized():
+    flash("You need to log in to access this page.", "warning")
+    return redirect(url_for(login_manager.login_view))
 
-# @app.route('/add/<int:a>/<int:b>')
-# def add(a, b):
-#     from tasks.testlongtask import add_numbers
-#     # Call the Celery task
-#     task = add_numbers.delay(a, b)
-#     return f"Task ID: {task.id}, Check status later!"
-
-# @app.route('/result/<task_id>')
-# def result(task_id):
-#     task = add_numbers.AsyncResult(task_id)
-#     if task.state == 'PENDING':
-#         return "Task is still processing..."
-#     elif task.state == 'SUCCESS':
-#         return f"Task result: {task.result}"
-#     else:
-#         return f"Task failed or is in {task.state} state."
-#
 
 if __name__ == '__main__':
     with app.app_context():
         from app.models import db
         db.create_all()
+
     app.run()
+
+
