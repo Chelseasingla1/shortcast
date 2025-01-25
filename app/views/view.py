@@ -1831,29 +1831,6 @@ def preferences():
 
     return render_template('profile.html',email_form=email_form,form = form)
 
-@views_bp.route('/add/<int:a>/<int:b>')
-def add(a, b):
-    from tasks.testlongtask import add_numbers
-    task = add_numbers.apply_async(args=[a,b])
-    task_id = task.id
-
-    task_info_singleton = TaskInfoSingleton()
-    task_info_singleton.set_task_info(task_id,'add_numbers')
-    return jsonify({'task_id': task_id, 'message': 'Task submitted!'})
-
-@views_bp.route('/result/<task_id>')
-def result(task_id):
-
-    from tasks.testlongtask import add_numbers
-    task = add_numbers.AsyncResult(task_id)
-    if task.state == 'PENDING':
-        return "Task is still processing..."
-    elif task.state == 'SUCCESS':
-        return f"Task result: {task.result}"
-    else:
-        return f"Task failed or is in {task.state} state."
-
-
 
 @views_bp.route('/email', methods=['POST'])
 def email_route():
