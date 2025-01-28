@@ -37,7 +37,7 @@ app.config['WTF_CSRF_ENABLED'] = True
 db_password = os.getenv('POSTGRES_PASSWORD')
 database = os.getenv('POSTGRES_DB')
 app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"postgresql://ultimate:{db_password}@db:5432/{database}"
+    f"postgresql://ultimate:{db_password}@postgres:5432/{database}"
 )
 
 
