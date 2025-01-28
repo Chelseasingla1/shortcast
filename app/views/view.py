@@ -1834,31 +1834,37 @@ def preferences():
 
 @views_bp.route('/email', methods=['POST'])
 def email_route():
+    referrer = request.referrer
     try:
         from tasks.emailservice import send_verification_email
-        referrer = request.referrer
+
         form = EmailForm(request.form)
+
         if form.validate_on_submit():
             logger.info('Form is valid, processing data')
             email = form.email.data
             token = 'd'
+
             # Send email task
             task = send_verification_email.apply_async(args=[email, token])
             task_id = task.id
             task_info_singleton = TaskInfoSingleton()
             task_info_singleton.set_task_info(task_id, 'send_verification')
 
+            # Flash a success message
             flash('Sent Subscription Message to your Inbox', 'success')
-            return jsonify({
-                "message": "Verification email is being sent.",
-                "task_id": task.id
-            }), 202 # Redirect to the current URL
+
         else:
+            # Flash an error message if form validation fails
             flash('Invalid form data. Please try again.', 'danger')
-            return redirect(referrer)
+
     except Exception as e:
-        logger.error(f"Error in sending email: {str(e)}")
-        return jsonify({"error": "Failed to process the email request"}), 500
+        # Log the error and flash a failure message
+        logger.error(f"Error processing email route: {str(e)}")
+        flash('An error occurred. Please try again later.', 'danger')
+
+    return redirect(referrer)
+
 
 @views_bp.route('/categories')
 def categories():
@@ -1933,4 +1939,4 @@ def logout():
 
     return redirect(url_for('views.index'))
 
-#TODO : find a way to properly arrange the api
+#TODO : implement live podcast feature

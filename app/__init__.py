@@ -12,7 +12,6 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_admin import Admin
-from flask_admin.contrib.sqla import ModelView
 from flasgger import Swagger
 from  flask_socketio import SocketIO
 
@@ -34,7 +33,14 @@ app.config['CELERY_BROKER_URL'] = os.getenv('CELERY_BROKER_URL')
 app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND')
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', os.getenv('FLASK_SECRET_KEY'))
 app.config['WTF_CSRF_ENABLED'] = True
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI_SHORTCAST', 'sqlite:///default.db')
+
+db_password = os.getenv('POSTGRES_PASSWORD')
+database = os.getenv('POSTGRES_DB')
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    f"postgresql://ultimate:{db_password}@db:5432/{database}"
+)
+
+
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
 
 

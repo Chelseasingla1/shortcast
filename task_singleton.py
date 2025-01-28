@@ -16,7 +16,7 @@ class TaskInfoSingleton:
             cls._instance._initialize(*args, **kwargs)
         return cls._instance
 
-    def _initialize(self, host='localhost', port=6379, db=0):
+    def _initialize(self, host='redis', port=6379, db=0):
         """Initialize the Redis client."""
         self._redis_client = redis.StrictRedis(host=host, port=port, db=db, decode_responses=True)
         logger.info('redis initialized')

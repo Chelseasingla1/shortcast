@@ -1,5 +1,2 @@
-from app import app, socketio
+from app import app
 
-if __name__ == '__main__':
-    # Run the app with Flask-SocketIO
-    app.run(debug=True)
