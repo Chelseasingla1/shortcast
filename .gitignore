@@ -5,3 +5,4 @@ __pycache__/
 api/auth/__pycache__/
 instance/
 test.py
+.flaskenv
