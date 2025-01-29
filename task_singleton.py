@@ -1,8 +1,14 @@
+import os
+import dotenv
 import redis
 from typing import Any
 import logging
+from dotenv import load_dotenv
+load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
+
+redis_password = os.getenv('REDIS_PASSWORD')
 class TaskInfoSingleton:
     """
     A singleton class to handle interactions with Redis.
@@ -16,9 +22,9 @@ class TaskInfoSingleton:
             cls._instance._initialize(*args, **kwargs)
         return cls._instance
 
-    def _initialize(self, host='redis', port=6379, db=0):
+    def _initialize(self, host='redis.railway.internal', port=6379):
         """Initialize the Redis client."""
-        self._redis_client = redis.StrictRedis(host=host, port=port, db=db, decode_responses=True)
+        self._redis_client = redis.StrictRedis(host=host, port=port,password=redis_password, decode_responses=True)
         logger.info('redis initialized')
     def set_value(self, key: str, value: Any):
         """Set a key-value pair in Redis."""

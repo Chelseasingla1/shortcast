@@ -34,11 +34,8 @@ app.config['CELERY_RESULT_BACKEND'] = os.getenv('CELERY_RESULT_BACKEND')
 app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', os.getenv('FLASK_SECRET_KEY'))
 app.config['WTF_CSRF_ENABLED'] = True
 
-db_password = os.getenv('POSTGRES_PASSWORD')
-database = os.getenv('POSTGRES_DB')
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"postgresql://ultimate:{db_password}@postgres:5432/{database}"
-)
+db_uri = os.getenv('DB_URI')
+app.config['SQLALCHEMY_DATABASE_URI'] =db_uri
 
 
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=3)
