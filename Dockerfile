@@ -29,4 +29,5 @@ USER celeryuser
 EXPOSE 5000
 
 # Default command (for Flask app)
-CMD ["gunicorn", "run:app"]
+CMD ["gunicorn", "--workers", "4", "--timeout", "120", "run:app"]
+
